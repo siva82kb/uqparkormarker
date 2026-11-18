@@ -1,6 +1,6 @@
 # UQ Parkour Annotator: build plan
 
-Status: draft for discussion. Nothing is built yet.
+Status: build in progress. See section 9 for what is done.
 
 ## 1. User flow
 
@@ -124,6 +124,9 @@ start_time, end_time, task`.
 ```
 run.bat             downloads uv on first run, then starts the server and opens the browser
 pyproject.toml      pinned Python version and packages
+uv.lock             exact package versions, written by uv
+.python-version     the Python version uv downloads
+tests/              unit tests (standard-library unittest, no participant data)
 study.toml          every design choice: labels, segment count, window length, seed, sampling strategy
 local.toml          data source, source-video folder, subject and rater name; written by the app (ignored by git)
 app.py              Flask routes only; no logic
@@ -149,18 +152,32 @@ standard library.
 
 ## 8. Look and feel
 
-One centred column, generous white space, system fonts, UQ purple (`#51247A`)
-as the single accent colour. No front-end framework and no build step: plain
+White page, hairline rules, compact spacing. Colours come from the UQ brand
+palette: purple (`#51247A`) for the title bar, titles and task video, and the
+UQ greys for rules and unlabelled video. Typefaces are UQ's web fonts:
+Montserrat for headings and figures, Roboto for text. Both are bundled in
+`static/fonts/` with their licences, so the app needs no internet after the
+first run. The title bar stays at the top of the window while scrolling. Pages
+that are read (setup, messages) sit in a narrow centred column; pages that
+show data (summary) use the window width, up to about 1360 px. No front-end framework and no build step: plain
 HTML, one stylesheet, one small script.
 
 ## 9. Build order
 
-1. `vidt.py`, `dataset.py`, checked against the sample subject
-2. `summary.py` and its page
-3. `sampling.py`, `extract.py`, generate page with progress
-4. `annotations.py`, annotate page
-5. Sign-in, subject list, styling pass
-6. End-to-end run on the sample subject; `run.bat`; rater instructions
+Everything is run through `uv` from the first step (`uv run ...`), never
+through another Python, so development uses the same pinned Python and
+packages the raters will get. `uv.lock` is committed.
+
+1. `pyproject.toml`, `study.toml`, `config.py` (done)
+2. `vidt.py`, `dataset.py`, checked against the sample subject (done)
+3. `summary.py` and its page (done; needs a hand-written `local.toml` until
+   the setup pages exist)
+4. `sampling/`, `extract.py`, generate page with progress
+5. `annotations.py`, annotate page
+6. Setup pages (data source, folder, subject, sign-in), styling pass
+7. End-to-end run on the sample subject; `run.bat`; rater instructions
+8. First-run test from a fresh copy of the repo with no `.venv/` or
+   `.runtime/`, ideally on a computer that has never run the app
 
 ## 10. Decisions
 

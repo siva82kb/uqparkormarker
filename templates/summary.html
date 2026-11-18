@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Data summary · {{ subject }}{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block content %}
+{% set s = summary %}
+<p class="eyebrow">Data summary</p>
+<h1>{{ subject }}</h1>
+
+{% if not s.start %}
+<p class="lead">No videos with timestamps were found for this subject.</p>
+{% else %}
+<p class="lead">
+  Recorded on {{ s.start.strftime('%d %B %Y').lstrip('0') }},
+  from {{ s.start.strftime('%H:%M') }} to {{ s.end.strftime('%H:%M') }}.
+</p>
+
+<section class="figures">
+  <div class="figure">
+    <span class="figure-label">Videos</span>
+    <span class="figure-value">{{ s.n_videos }}</span>
+    <span class="figure-note">{{ s.n_task }} task · {{ s.n_unlabelled }} unlabelled</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Recorded time</span>
+    <span class="figure-value">{{ s.total_seconds | duration }}</span>
+    <span class="figure-note">{{ s.task_seconds | duration }} task · {{ s.unlabelled_seconds | duration }} unlabelled</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Frame rate</span>
+    <span class="figure-value">{{ '%.1f' | format(s.fps_median) }} fps</span>
+    <span class="figure-note">{{ '%.2f' | format(s.fps_min) }} to {{ '%.2f' | format(s.fps_max) }} across files</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">{{ '%g' | format(study.sampling.window_seconds) }} s windows available</span>
+    <span class="figure-value">{{ '{:,}'.format(s.n_windows) }}</span>
+    <span class="figure-note">up to {{ study.sampling.n_segments }} will be sampled</span>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Timeline</h2>
+    <ul class="legend">
+      <li><span class="swatch span-task"></span>Task video</li>
+      <li><span class="swatch span-unlabelled"></span>Unlabelled video</li>
+      <li><span class="swatch span-gap"></span>No video</li>
+    </ul>
+  </div>
+  <div class="timeline" id="timeline" role="img"
+       aria-label="Timeline of task video, unlabelled video and gaps. The sections below give the same information.">
+    {% for span in s.timeline %}
+    <span class="span span-{{ span.kind }}"
+          style="left: {{ '%.4f' | format(span.left) }}%; width: {{ '%.4f' | format(span.width) }}%"
+          data-label="{{ span.label }}" data-length="{{ span.seconds | duration }}"></span>
+    {% endfor %}
+  </div>
+  <div class="timeline-axis" aria-hidden="true">
+    {% for label, left in s.ticks %}
+    <span class="tick" style="left: {{ '%.4f' | format(left) }}%">{{ label }}</span>
+    {% endfor %}
+  </div>
+  <p class="timeline-readout" id="timeline-readout" aria-live="polite"
+     data-idle="Point at the strip to see what each stretch is.">Point at the strip to see what each stretch is.</p>
+</section>
+
+<div class="pair">
+  <section>
+    <h2>Problems</h2>
+    {% if s.problems %}
+    <ul class="problems">
+      {% for problem in s.problems %}<li>{{ problem }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p class="note">None found. Every video has matching timestamps.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Gaps longer than 1 s</h2>
+    {% if s.gaps %}
+    <dl class="facts">
+      <div><dt>Gaps between files</dt><dd>{{ s.gaps | length }}</dd></div>
+      <div><dt>Total time without video</dt><dd>{{ s.gaps | sum(attribute='seconds') | duration }}</dd></div>
+      <div><dt>Longest gap</dt><dd>{{ s.gaps | map(attribute='seconds') | max | duration }}</dd></div>
+    </dl>
+    {% else %}
+    <p class="note">None. The recording is continuous.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section id="tasks">
+  <h2>Tasks</h2>
+  <div class="pair pair-even">
+    {% for column in s.tasks | slice(2) %}
+    <table>
+      <thead>
+        <tr><th class="num">No.</th><th>Task</th><th class="num">Duration</th><th class="num">Repeats</th></tr>
+      </thead>
+      <tbody>
+        {% for task in column %}
+        <tr>
+          <td class="num dim">{{ task.number }}</td>
+          <td>{{ task.name }}</td>
+          <td class="num">{{ task.seconds | duration }}</td>
+          <td class="num">{{ task.repeats }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

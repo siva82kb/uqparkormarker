@@ -1,0 +1,33 @@
+# Study design. Every design choice lives here, not in the code.
+# Clips record a copy of this file (design.toml); if the two ever differ,
+# the app refuses to mix them.
+
+[source]
+# The .vidt frame times are local wall-clock time. Brisbane is UTC+10 all year.
+utc_offset_hours = 10
+
+[sampling]
+strategy = "uniform"      # a module name in parkour/sampling/
+n_segments = 500          # upper limit per subject
+window_seconds = 1.0
+seed = 20221125           # fixed, so every rater gets the same windows
+
+[[labels]]
+key = "1"
+name = "Task-related functional"
+
+[[labels]]
+key = "2"
+name = "Non-task-related functional"
+
+[[labels]]
+key = "3"
+name = "Non-functional"
+
+[[labels]]
+key = "4"
+name = "No activity/movement"
+
+[[labels]]
+key = "5"
+name = "Unknown / arm out of view"

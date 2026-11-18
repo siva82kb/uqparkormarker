@@ -1,0 +1,13 @@
+[project]
+name = "uqparkormarker"
+version = "0.1.0"
+description = "Local web app for labelling 1 s video windows from the UQ Parkour study."
+requires-python = "==3.12.*"
+dependencies = [
+    "flask>=3.1,<4",
+    "imageio-ffmpeg>=0.6,<1",
+]
+
+# An app, not an installable package: uv only manages the environment.
+[tool.uv]
+package = false

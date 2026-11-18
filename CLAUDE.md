@@ -15,6 +15,8 @@ See `README.md` for usage and `PLAN.md` for the design and open decisions.
 
 ## Environment
 
-- Python: `D:\anaconda3\python.exe` (not on PATH).
+- Run everything through `uv` (`uv run python ...`), never Anaconda, so
+  development matches what raters get. Python 3.12, pinned in `pyproject.toml`.
+- Tests: `uv run python -m unittest discover -s tests -t .`
 - Sample subject: `data/221125_SK_Test`.
 - `private/` holds the user's older analysis code and data. Read-only reference.

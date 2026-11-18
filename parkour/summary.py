@@ -1,0 +1,216 @@
+"""Build the data summary for one subject from its list of videos.
+
+Pure calculation: no file access and no HTML. Durations are in seconds.
+"""
+
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from statistics import median
+
+from .dataset import Video
+
+GAP_SECONDS = 1.0          # report silences between files longer than this
+NAME_DRIFT_SECONDS = 1.0   # file-name time vs first frame: tolerated difference
+
+
+@dataclass
+class Span:
+    """A stretch of the timeline strip, as percentages of the whole recording."""
+
+    kind: str       # "task", "unlabelled" or "gap"
+    label: str
+    seconds: float
+    left: float
+    width: float
+
+
+@dataclass
+class TaskRow:
+    number: int
+    name: str
+    seconds: float
+    repeats: int
+
+
+@dataclass
+class Summary:
+    n_task: int
+    n_unlabelled: int
+    task_seconds: float
+    unlabelled_seconds: float
+    start: datetime | None
+    end: datetime | None
+    fps_median: float | None
+    fps_min: float | None
+    fps_max: float | None
+    gaps: list[Span]
+    problems: list[str]
+    tasks: list[TaskRow]
+    timeline: list[Span]
+    ticks: list[tuple[str, float]]   # clock label and position (%) along the strip
+    n_windows: int
+
+    @property
+    def n_videos(self) -> int:
+        return self.n_task + self.n_unlabelled
+
+    @property
+    def total_seconds(self) -> float:
+        return self.task_seconds + self.unlabelled_seconds
+
+    @property
+    def span_seconds(self) -> float:
+        return (self.end - self.start).total_seconds() if self.start else 0.0
+
+
+def duration(video: Video) -> float:
+    """Recorded seconds in a video: first frame to last frame."""
+    if not video.times:
+        return 0.0
+    return (video.times[-1] - video.times[0]) / 1e6
+
+
+def count_windows(videos: list[Video], window_seconds: float) -> int:
+    """How many non-overlapping windows fit, each wholly inside one video."""
+    return sum(int(duration(v) // window_seconds) for v in videos)
+
+
+def build(
+    videos: list[Video],
+    window_seconds: float,
+    utc_offset_hours: float,
+    missing: list[str] = (),
+) -> Summary:
+    """`missing` names videos the experiment record lists but the folder lacks."""
+    usable = [v for v in videos if v.times]   # timed videos, in recording order
+    zone = timezone(timedelta(hours=utc_offset_hours))
+    rates = [(len(v.times) - 1) / duration(v) for v in usable if duration(v) > 0]
+    timeline = _timeline(usable)
+    start = _local(usable[0].times[0], zone) if usable else None
+    end = _local(max(v.times[-1] for v in usable), zone) if usable else None
+
+    return Summary(
+        n_task=sum(v.is_task for v in videos),
+        n_unlabelled=sum(not v.is_task for v in videos),
+        task_seconds=sum(duration(v) for v in usable if v.is_task),
+        unlabelled_seconds=sum(duration(v) for v in usable if not v.is_task),
+        start=start,
+        end=end,
+        fps_median=median(rates) if rates else None,
+        fps_min=min(rates) if rates else None,
+        fps_max=max(rates) if rates else None,
+        gaps=[s for s in timeline if s.kind == "gap"],
+        problems=_missing_note(missing) + _problems(videos),
+        tasks=_task_table(usable),
+        timeline=timeline,
+        ticks=_ticks(start, end) if usable else [],
+        n_windows=count_windows(usable, window_seconds),
+    )
+
+
+def _local(microseconds: int, zone: timezone) -> datetime:
+    return datetime.fromtimestamp(microseconds / 1e6, zone)
+
+
+def _ticks(start: datetime, end: datetime) -> list[tuple[str, float]]:
+    """Clock marks along the strip, on round minutes, about six at most."""
+    total = (end - start).total_seconds()
+    if total <= 0:
+        return []
+    step = next((m for m in (1, 2, 5, 10, 15, 30, 60) if total / (m * 60) <= 6), 120)
+    tick = start.replace(second=0, microsecond=0)
+    tick += timedelta(minutes=step - tick.minute % step)   # next round mark
+    ticks = []
+    while tick < end:
+        ticks.append((tick.strftime("%H:%M"), 100 * (tick - start).total_seconds() / total))
+        tick += timedelta(minutes=step)
+    return ticks
+
+
+def _timeline(usable: list[Video]) -> list[Span]:
+    """Videos and the gaps between them, placed along the whole recording."""
+    if not usable:
+        return []
+    origin = usable[0].times[0]
+    total = (max(v.times[-1] for v in usable) - origin) or 1
+
+    def span(kind: str, label: str, begin: int, end: int) -> Span:
+        return Span(
+            kind=kind,
+            label=label,
+            seconds=(end - begin) / 1e6,
+            left=100 * (begin - origin) / total,
+            width=100 * (end - begin) / total,
+        )
+
+    spans, previous_end = [], origin
+    for v in usable:
+        begin, end = v.times[0], v.times[-1]
+        if (begin - previous_end) / 1e6 > GAP_SECONDS:
+            spans.append(span("gap", "No video", previous_end, begin))
+        kind = "task" if v.is_task else "unlabelled"
+        spans.append(span(kind, v.task_name or "Unlabelled", begin, end))
+        previous_end = max(previous_end, end)
+    return spans
+
+
+def _task_table(usable: list[Video]) -> list[TaskRow]:
+    """One row per task number: total time and how often it was recorded."""
+    seconds, repeats, names = defaultdict(float), defaultdict(int), {}
+    for v in usable:
+        if v.is_task:
+            seconds[v.task_number] += duration(v)
+            repeats[v.task_number] += 1
+            names[v.task_number] = _task_title(v)
+    return [TaskRow(n, names[n], seconds[n], repeats[n]) for n in sorted(seconds)]
+
+
+def _task_title(video: Video) -> str:
+    """'03:Tie shoelaces' -> 'Tie shoelaces'; the number has its own column."""
+    name = video.task_name or ""
+    return name.split(":", 1)[-1].strip() or "(no name)"
+
+
+def _missing_note(missing: list[str]) -> list[str]:
+    """One line for all the listed-but-absent videos, split by kind."""
+    if not missing:
+        return []
+    tasks = sum(name.startswith("task_") for name in missing)
+    return [
+        f"{len(missing)} videos listed in experiment_details.json are not in the "
+        f"videos folder ({tasks} task, {len(missing) - tasks} unlabelled)."
+    ]
+
+
+def _problems(videos: list[Video]) -> list[str]:
+    """Plain-language notes on anything wrong with the files."""
+    found = []
+    for v in videos:
+        if v.times is None:
+            found.append(f"{v.name}: no .vidt timestamp file, so it cannot be sampled.")
+            continue
+        if not v.times:
+            found.append(f"{v.name}: the .vidt timestamp file is empty.")
+            continue
+        if v.frame_count is None:
+            found.append(f"{v.name}: could not read the frame count from the video.")
+        elif v.frame_count != len(v.times):
+            found.append(
+                f"{v.name}: {v.frame_count} frames but {len(v.times)} timestamps."
+            )
+        steps = [b - a for a, b in zip(v.times, v.times[1:])]
+        backward = sum(s < 0 for s in steps)
+        repeated = sum(s == 0 for s in steps)
+        if backward:
+            found.append(f"{v.name}: timestamps go backwards in {backward} places.")
+        if repeated:
+            found.append(
+                f"{v.name}: {repeated} frames repeat the previous frame's timestamp."
+            )
+        drift = abs(v.times[0] - v.filename_time) / 1e6
+        if drift > NAME_DRIFT_SECONDS:
+            found.append(
+                f"{v.name}: first frame is {drift:.1f} s away from the time in the file name."
+            )
+    return found
