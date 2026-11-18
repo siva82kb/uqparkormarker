@@ -1,0 +1,30 @@
+# --- Participant data: never committed ---
+data/
+data4annotation/
+private/
+
+# --- Machine-specific setup (holds the source path, subject and rater name) ---
+local.toml
+
+# --- Runtime downloaded by run.bat (uv, Python, packages) ---
+.runtime/
+.venv/
+uv.exe
+
+# --- Video and sensor files, wherever they appear ---
+*.avi
+*.mp4
+*.vidt
+*.h5
+*.pdo
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Editor and OS clutter ---
+.vscode/
+.idea/
+._*
