@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Generating clips · {{ subject }}{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block content %}
+{% set sampling = study.sampling %}
+<p class="eyebrow">Generating clips</p>
+<h1>{{ subject }}</h1>
+<p class="lead">
+  Random {{ '%g' | format(sampling.window_seconds) }} s windows are chosen from the
+  videos and each one is cut into a short clip for annotation.
+</p>
+
+<section class="figures">
+  <div class="figure">
+    <span class="figure-label">Clips</span>
+    <span class="figure-value" id="clip-total">{{ progress.total or sampling.n_segments }}</span>
+    <span class="figure-note">at most {{ sampling.n_segments }} per subject</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Clip length</span>
+    <span class="figure-value">{{ '%g' | format(sampling.window_seconds) }} s</span>
+    <span class="figure-note">{{ sampling.frames_per_clip }} frames, each clip inside a single video</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Sampling</span>
+    <span class="figure-value">{{ sampling.strategy | capitalize }}</span>
+    <span class="figure-note">over recorded time, no overlap · seed {{ sampling.seed }}</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Format</span>
+    <span class="figure-value">MP4</span>
+    <span class="figure-note">H.264, no audio · quality {{ study.clips.crf }}</span>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>Progress</h2>
+    <p class="progress-count"><span id="progress-count">{{ progress.done }} of {{ progress.total or '…' }}</span></p>
+  </div>
+  <div class="progress" id="progress" role="progressbar" aria-label="Clips cut"
+       aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.done }}"
+       data-status-url="{{ url_for('generate_status') }}">
+    <div class="progress-fill" id="progress-fill"
+         style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+  </div>
+  <p class="progress-message" id="progress-message" aria-live="polite">{{ progress.message or 'Starting…' }}</p>
+  <p class="progress-error" id="progress-error" {% if not progress.error %}hidden{% endif %}>{{ progress.error }}</p>
+  <p class="note" id="progress-help">
+    You can close this page. If the app is stopped, generation carries on
+    from the first missing clip the next time it starts.
+  </p>
+</section>
+
+<section>
+  <h2>Folders</h2>
+  <dl class="facts">
+    <div><dt>Source videos</dt><dd class="path">{{ source }}</dd></div>
+    <div><dt>Clips are written to</dt><dd class="path">{{ folder }}</dd></div>
+  </dl>
+</section>
+
+<p class="actions"><a class="link" href="{{ url_for('summary_page') }}">Back to the data summary</a></p>
+{% endblock %}

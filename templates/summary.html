@@ -9,10 +9,21 @@
 {% if not s.start %}
 <p class="lead">No videos with timestamps were found for this subject.</p>
 {% else %}
-<p class="lead">
-  Recorded on {{ s.start.strftime('%d %B %Y').lstrip('0') }},
-  from {{ s.start.strftime('%H:%M') }} to {{ s.end.strftime('%H:%M') }}.
-</p>
+<div class="hero-row">
+  <p class="lead">
+    Recorded on {{ s.start.strftime('%d %B %Y').lstrip('0') }},
+    from {{ s.start.strftime('%H:%M') }} to {{ s.end.strftime('%H:%M') }}.
+  </p>
+  {% if clip_state == 'none' %}
+  <form method="post" action="{{ url_for('generate_page') }}">
+    <button class="button" type="submit">Generate clips</button>
+  </form>
+  {% elif clip_state == 'partial' %}
+  <a class="button" href="{{ url_for('generate_page') }}">Continue generating clips</a>
+  {% else %}
+  <a class="button button-quiet" href="{{ url_for('generate_page') }}">Clips are ready</a>
+  {% endif %}
+</div>
 
 <section class="figures">
   <div class="figure">

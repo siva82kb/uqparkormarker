@@ -10,7 +10,12 @@ utc_offset_hours = 10
 strategy = "uniform"      # a module name in parkour/sampling/
 n_segments = 500          # upper limit per subject
 window_seconds = 1.0
+frames_per_clip = 10      # every clip holds exactly this many frames (1 s at 10 fps)
 seed = 20221125           # fixed, so every rater gets the same windows
+
+[clips]
+# H.264 quality: lower is sharper and larger. 18 is visually lossless.
+crf = 18
 
 [[labels]]
 key = "1"

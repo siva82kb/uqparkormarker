@@ -95,6 +95,27 @@ def avi_frame_count(path: Path) -> int | None:
     return struct.unpack_from("<I", head, at + 8 + 16)[0]
 
 
+def avi_frame_rate(path: Path) -> float | None:
+    """Nominal frames per second, from the AVI video stream header.
+
+    This is the rate the container plays at (frame n sits at n / rate), which
+    is what seeking needs. The true capture times are in the .vidt file.
+    """
+    with Path(path).open("rb") as fh:
+        head = fh.read(1024)
+    at = head.find(b"strh")
+    if not head.startswith(b"RIFF") or at < 0 or head[at + 8 : at + 12] != b"vids":
+        return None
+    # 'strh', chunk size, then 20 bytes of fields before dwScale and dwRate.
+    scale, rate = struct.unpack_from("<II", head, at + 8 + 20)
+    return rate / scale if scale else None
+
+
+def video_path(subject_dir: Path, video_file: str) -> Path:
+    """Where a video named in segments.csv lives."""
+    return Path(subject_dir) / VIDEO_DIR / video_file
+
+
 def _frame_times(vidt_file: Path, zone: timezone) -> list[int] | None:
     """Frame times as unix microseconds, or None if the .vidt is missing."""
     if not vidt_file.exists():

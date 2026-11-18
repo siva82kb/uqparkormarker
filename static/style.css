@@ -286,6 +286,83 @@ th:last-child, td:last-child { padding-right: 0; }
 td.dim { width: 1%; }
 tbody tr:hover { background: var(--accent-soft); }
 
+/* ---- Buttons and links ---- */
+
+.hero-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.button {
+  display: inline-block;
+  padding: 9px 20px;
+  border: 1px solid var(--uq-purple);
+  border-radius: 4px;
+  background: var(--uq-purple);
+  color: #fff;
+  font: 600 0.85rem var(--heading);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover { background: var(--uq-purple-dark); border-color: var(--uq-purple-dark); }
+.button:focus-visible, .link:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 2px; }
+.button-quiet { background: transparent; color: var(--uq-purple); }
+.button-quiet:hover { background: var(--accent-soft); border-color: var(--uq-purple); }
+
+.link { color: var(--uq-purple); }
+.actions { margin: 26px 0 0; }
+
+/* ---- Progress ---- */
+
+.progress {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--uq-purple);
+  transition: width 0.4s ease;
+}
+
+.progress-count {
+  margin: 0 0 8px;
+  font: 600 0.85rem var(--heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-message {
+  margin: 8px 0 0;
+  min-height: 1.45em;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-error {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--uq-purple);
+  background: var(--accent-soft);
+  overflow-wrap: anywhere;
+}
+
+.progress-message + .note, .progress-error + .note { margin-top: 6px; }
+
+.facts .path {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.9em;
+}
 /* ---- Narrow screens ---- */
 
 @media (max-width: 900px) {

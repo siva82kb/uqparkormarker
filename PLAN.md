@@ -85,11 +85,16 @@ using the `.vidt` times, not a fixed frame rate.
 
 ## 4. Sampling
 
-- A window is a start time and an end time one second later, lying wholly
-  inside one video file.
-- Windows are drawn uniformly over recorded time, so longer files contribute
-  proportionally more.
-- Windows do not overlap one another.
+- A window is exactly 10 consecutive frames (1 s at 10 fps), lying wholly
+  inside one video file. The number is `frames_per_clip` in `study.toml`.
+- A window may start at any instant (3.21 s, say); it begins at the first
+  frame at or after that instant. There is no fixed 0 s, 1 s, 2 s grid.
+- Windows are drawn one at a time, each start uniform over every instant at
+  which a window could start, so longer files contribute proportionally more.
+- Windows do not overlap one another: a draw that would share a frame with a
+  window already chosen is discarded and drawn again.
+- `start_time` and `end_time` in `segments.csv` are the timestamps of the
+  window's first and last frame, so they are about 0.9 s apart.
 - Up to 500 per subject. Fewer if the subject has less usable footage.
 - The random seed for choosing windows is fixed in `study.toml`, so every
   rater gets the same windows and clips for a given subject (see decision A).
@@ -100,7 +105,9 @@ start_time, end_time, task`.
 ## 5. Clip extraction
 
 - ffmpeg cuts each window by frame number and re-encodes to H.264 MP4, since
-  browsers cannot play XVID.
+  browsers cannot play XVID. It seeks straight to the first frame instead of
+  decoding from the start of the file; this was checked to return exactly the
+  same frames, about 50 times faster on the longest video.
 - Audio is dropped.
 - ffmpeg comes from the `imageio-ffmpeg` package, so nothing is installed
   system-wide.
@@ -136,7 +143,9 @@ parkour/
     dataset.py      find subjects and videos; frame times per video
     summary.py      build the data summary
     sampling/       one file per sampling strategy, chosen by name in study.toml
-    extract.py      cut clips with ffmpeg; progress tracking
+    clipset.py      a subject's clip folder: segments.csv, design.toml, which clips exist
+    extract.py      cut clips with ffmpeg in a background thread; progress tracking
+    fmt.py          format values for display
     annotations.py  read and append the annotation CSV
 templates/          base, setup pages, summary, progress, mismatch, annotate, done
 static/             style.css, app.js
@@ -172,7 +181,8 @@ packages the raters will get. `uv.lock` is committed.
 2. `vidt.py`, `dataset.py`, checked against the sample subject (done)
 3. `summary.py` and its page (done; needs a hand-written `local.toml` until
    the setup pages exist)
-4. `sampling/`, `extract.py`, generate page with progress
+4. `sampling/`, `clipset.py`, `extract.py`, generate page with progress, and
+   the settings-mismatch page (done)
 5. `annotations.py`, annotate page
 6. Setup pages (data source, folder, subject, sign-in), styling pass
 7. End-to-end run on the sample subject; `run.bat`; rater instructions
