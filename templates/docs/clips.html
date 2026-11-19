@@ -51,7 +51,9 @@ raters label.
     design.toml                        step 3: a copy of study.toml as it was then
     clips/seg_0001.mp4 ...             step 4: the clips, one file each
     generation_time.json               step 4: how long the cutting has taken
-    Pxx_&lt;rater&gt;_annotations.csv        the labels, one file per rater
+    Pxx_&lt;rater&gt;_annotations.csv        a rater's labels in progress
+    Pxx_&lt;rater&gt;_annotations_&lt;date&gt;-&lt;time&gt;.csv
+                                       a rater's saved labels
     ratings_uploaded.json              what was last copied to the shared folder</pre>
   <p class="tree-title"><strong>3. The shared folder</strong>: on the study's storage drive, for passing clips and labels between raters. Its name ({{ study.share.folder }}) is set in <code>study.toml</code>.</p>
   <pre class="code tree">&lt;study folder&gt;/{{ study.share.folder }}/
@@ -215,7 +217,7 @@ raters label.
 
 <section>
   <h2>What is saved for each label</h2>
-  <p class="note">Each rater has one file, <code>&lt;subject&gt;_&lt;rater&gt;_annotations.csv</code>. A row is added each time the rater saves a clip by moving on to the next one.</p>
+  <p class="note">A rater's labels are in files named <code>&lt;subject&gt;_&lt;rater&gt;_annotations</code>, with or without a date. Each file has these columns.</p>
   <table style="margin-top: 8px">
     <thead><tr><th>Column</th><th class="wrap">Meaning</th></tr></thead>
     <tbody>
