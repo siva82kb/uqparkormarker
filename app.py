@@ -1,5 +1,6 @@
 """Flask routes only. All logic lives in the parkour package."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -502,4 +503,6 @@ if __name__ == "__main__":
     # `--dev`: restart on a change to the code, and reload the open page on a
     # change to any of the app's files. For development only.
     app.config["DEV"] = "--dev" in sys.argv
-    app.run(host="127.0.0.1", port=5000, debug=app.config["DEV"])
+    # The port is 5000 unless PARKOUR_PORT says otherwise (run.bat passes it on).
+    port = int(os.environ.get("PARKOUR_PORT", 5000))
+    app.run(host="127.0.0.1", port=port, debug=app.config["DEV"])

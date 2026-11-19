@@ -247,7 +247,8 @@ data4annotation/<subject>/
     design.toml                         copy of the settings and seed used
     clips/seg_0001.mp4 ...
     generation_time.json                time spent generating so far, over every run
-    <subject>_<rater>_annotations.csv   one file per rater
+    <subject>_<rater>_annotations.csv   a rater's labels in progress (no date)
+    <subject>_<rater>_annotations_<date>-<time>.csv   saved labels; same name on the RDM
     ratings_uploaded.json               what was last uploaded to the shared folder
 ```
 
@@ -266,15 +267,18 @@ run by hand, with the app stopped: `uv run python reset.py`.
 | File in `data4annotation/<subject>/` | What a reset does |
 |---|---|
 | `clips/`, `segments.csv`, `design.toml`, `generation_time.json`, `ratings_uploaded.json` | Deleted. They can be made again. |
-| `<subject>_<rater>_annotations.csv` | Never deleted. Moved to `data4annotation/_archive/<subject>_<date>-<time>/`. |
+| Every annotation file, in progress or dated | Never deleted. Moved to `data4annotation/_archive/<subject>_<date>-<time>/`. |
 | `recording.json.gz` | Kept, unless `--recording` is given. |
 
 The rater's name in `local.toml` is kept unless `--rater` is given;
 `--rater` also removes the name used for uploads (`uploaded_as`). The
 program lists what it will do and asks for the subject's name to be typed
 before doing it (`--yes` skips the question). A subject other than the one
-in `local.toml` can be named: `uv run python reset.py Pxx`. The app itself
-still never deletes clips or labels.
+in `local.toml` can be named: `uv run python reset.py Pxx`. With
+`--ratings` only the labels are cleared: the annotation files are moved to
+the archive and the clips, `segments.csv` and `design.toml` are kept, so
+the same clips can be labelled again. The app itself still never deletes
+clips or labels.
 
 ## 2. Source data (as found on the RDM)
 
@@ -684,9 +688,18 @@ packages the raters will get. `uv.lock` is committed.
    ratings uploaded from the finished page (done; checked against a folder
    standing in for the RDM, not yet against the RDM itself)
 6. Styling pass
-7. End-to-end run on the sample subject; `run.bat` (not written yet);
-   rater instructions
-8. First-run test from a fresh copy of the repo with no `.venv/` or
+7. `run.bat` (done). Double-click to start. On first start it downloads uv
+   into `.runtime/`, and through it Python and the packages, also into
+   `.runtime/`, so nothing is installed elsewhere; then it starts the app and
+   opens the browser when the app answers. If the app is already running it
+   only opens the browser. `.gitattributes` keeps its Windows line endings,
+   including in a ZIP downloaded from GitHub. Rater instructions are in the
+   README.
+8. First-run test (done once, on the development computer): a fresh copy of
+   the repo with no `.venv/`, `.runtime/` or settings was started with
+   `run.bat` with no uv on the PATH. It set itself up in about 70 s (301 MB)
+   and a second start took 6 s; its tests passed. Still to do: the same on a
+   computer that has never run the app. Original note: a fresh copy with no `.venv/` or
    `.runtime/`, ideally on a computer that has never run the app
 
 ## 10. Decisions

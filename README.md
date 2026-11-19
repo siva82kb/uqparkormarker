@@ -21,21 +21,27 @@ in the app itself, under **Docs**. That is the only copy.
 ## What you need
 
 - 64-bit Windows.
-- [uv](https://docs.astral.sh/uv/), which fetches the right Python and the
-  packages on first run. A `run.bat` that installs it for you is planned
-  but not written yet.
+- An internet connection the first time, so that `run.bat` can download
+  what the app needs (about 300 MB). Nothing has to be installed by hand.
 - Access to the source videos: the study's RDM storage mapped as a drive
   (connect to the UQ VPN first if you are off campus), or a local copy.
 
 ## Starting the app
 
-In a terminal in this folder:
+**Double-click `run.bat`.**
 
-```
-uv run python app.py
-```
+- The first time, it downloads what the app needs into a folder named
+  `.runtime` next to it: a small tool called uv, then Python and the
+  packages. This takes a minute or two. Nothing is installed anywhere else
+  on the computer, so deleting the app's folder removes everything.
+- It then starts the app and opens it in your browser. Later starts take a
+  few seconds.
+- **Leave the black window open while you work. Close it to stop the app.**
+- If you double-click `run.bat` while the app is already running, it just
+  opens the app in your browser.
 
-and open `http://127.0.0.1:5000`.
+Developers who have [uv](https://docs.astral.sh/uv/) can start it from a
+terminal instead: `uv run python app.py`, then open `http://127.0.0.1:5000`.
 
 The first time, the app asks one question: **where is the study folder?**
 Connect to the VPN if you are off campus, make sure the RDM is open as a

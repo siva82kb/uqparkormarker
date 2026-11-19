@@ -155,6 +155,11 @@ the sync to the sensors remain to be done.
 
 - Run everything through `uv` (`uv run python ...`), never Anaconda, so
   development matches what raters get. Python 3.12, pinned in `pyproject.toml`.
+- Raters start the app by double-clicking `run.bat`. It downloads uv, Python
+  and the packages into `.runtime/` (git-ignored) on first start, and
+  nothing is installed elsewhere. It must keep Windows line endings
+  (`.gitattributes`). `PARKOUR_PORT` changes the port, for testing a second
+  copy beside the first.
 - Tests: `uv run python -m unittest discover -s tests -t .`
 - `uv run python app.py --dev` reloads the open page when any app file is
   saved (`parkour/devreload.py`). Development only; raters run without it.
