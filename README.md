@@ -1,58 +1,107 @@
 # UQ Parkour Annotator
 
 A small local web app for labelling functional upper-limb use in the UQ Parkour
-study videos. It draws random 1-second windows from a subject's videos, cuts
-them into short clips, and shows them one at a time to a rater, who assigns
-each clip one of four FAABOS categories.
+study videos. It draws random 1-second windows from a participant's videos,
+cuts them into short clips, and will show them one at a time to a rater, who
+assigns each clip a FAABOS category.
 
 Everything runs on the rater's own computer. Nothing is uploaded.
 
+**Status: under construction.** The data summary and clip generation work.
+The setup pages and the annotation page are not built yet. `PLAN.md` has the
+design, the decisions made, and the build order. `docs/HOW_IT_WORKS.md`
+explains how clips are chosen and what to keep in mind when interpreting the
+results.
+
 ## What you need
 
-- Python 3.10 or newer (Anaconda is fine)
-- The packages in `requirements.txt` (Flask, imageio-ffmpeg; h5py is optional)
-- The subject folders copied into `data/`
+- 64-bit Windows.
+- [uv](https://docs.astral.sh/uv/), which fetches the right Python and the
+  packages on first run. A `run.bat` that installs it for you is planned.
+- Access to the source videos: the study's RDM storage mapped as a drive
+  (connect to the UQ VPN first if you are off campus), or a local copy.
 
 ## Starting the app
 
-1. Double-click `run.bat` (or run `python app.py`).
-2. Your browser opens at `http://127.0.0.1:5000`.
+Until the setup pages exist, tell the app where the data is by creating a
+file named `local.toml` next to `app.py`:
 
-## Using it
+```toml
+data_source = "videos"
+source_dir = "X:/path/to/the/folder/holding/the/participant/folders"
+subject = "Pxx"
+```
 
-1. **Enter your name.** Your clips and annotations are stored under this name.
-2. **Choose a subject** from the list of folders found in `data/`.
-3. **Read the data summary** for that subject: videos, durations, frame rates,
-   gaps, and any problems found.
-4. **Generate segments.** The app picks the random 1 s windows and cuts the
-   clips. This takes a few minutes and shows progress.
-5. **Annotate.** Each clip loops until you label it. Keys `1`–`4` choose a
-   category, `Backspace` goes back one clip. You can close the app at any time
-   and carry on later.
+While testing, you can add `clip_limit = 25` to `local.toml`. The app then
+works with only the first 25 clips, which matters because cutting clips from
+the RDM over the VPN takes about half a minute each (several hours for 500).
+The full list of 500 is still drawn and saved; remove the line to cut the
+rest.
+
+Then, in a terminal in this folder:
+
+```
+uv run python app.py
+```
+
+and open `http://127.0.0.1:5000`.
+
+## What the app does today
+
+1. **Reads the videos.** The first page shows a progress bar while the frame
+   timestamps of every video are read. From the RDM this takes about a minute
+   and is done once each time the app starts.
+2. **Shows the data summary**: number of videos, recorded time, frame rate, a
+   timeline of task and unlabelled video, problems found in the files, gaps,
+   and the list of tasks.
+3. **Generates the clips.** "Generate clips" chooses up to 500 random,
+   non-overlapping 1 s windows and cuts each into an MP4 clip, showing
+   progress. If the app is closed part-way, it carries on from the first
+   missing clip next time.
+
+   Not every window can be chosen. The recorder sometimes stamped frames
+   late, which shows in the timestamps as a pause followed by repeated
+   values. A window containing a repeated timestamp, or a step of more than
+   0.1 s between frames, is never sampled, so that every clip's times can be
+   trusted when clips are later lined up with sensor data. The summary page
+   says what share of windows this leaves out.
+
+Annotation comes next.
+
+## Which participants are listed
+
+A participant is a folder named `P` plus digits in the source folder, with its
+videos directly in a `Video` folder. Participants whose `Video` folder is
+split into session subfolders are not offered for now.
 
 ## Where things are stored
 
 ```
-data/<subject>/videos/*.avi, *.vidt         source videos and frame timestamps
-data4annotation/<rater>/<subject>/
-    segments.csv                            the sampled windows
-    clips/seg_0001.mp4 ...                  the 1 s clips
-    <subject>_<rater>_annotations.csv       the labels
+<source>/Pxx/Video/*.avi, *.vidt, experiment_details.json     source videos (read only)
+
+data4annotation/<subject>/
+    segments.csv            the sampled windows
+    design.toml             copy of the settings they were drawn with
+    clips/seg_0001.mp4 ...  the 1 s clips
 ```
 
-## Annotation file
+`data4annotation/` and `local.toml` are never committed to git.
 
-One row is appended each time a clip is labelled. If a clip is relabelled, a
-new row is added and the latest row for that clip is the one that counts.
-
-| Column | Meaning |
-|---|---|
-| `segment_id` | Clip identifier, matching `segments.csv` |
-| `label` | The chosen category |
-| `rater` | Rater name |
-| `annotated_at` | When the label was saved (local time) |
+`segments.csv` has one row per clip: `segment_id`, `video_file`,
+`start_frame`, `end_frame` (inclusive), `start_time`, `end_time` (timestamps
+of the first and last frame, local time), and `task` (empty for unlabelled
+video).
 
 ## Settings
 
-`config.json` holds the category labels, the number of segments, the window
-length, and the folder locations.
+`study.toml` holds the study design: the category labels, the number of
+clips, the clip length, the sampling method and its random seed, the
+timestamp rule, and the clip quality. Every rater must use the same `study.toml`. If it changes after
+clips have been generated, the app stops and says what differs, because old
+and new clips must not be mixed.
+
+## For developers
+
+- Run everything through `uv`: `uv run python app.py`.
+- Tests: `uv run python -m unittest discover -s tests -t .`
+- Code layout and conventions: `PLAN.md` section 7 and `CLAUDE.md`.

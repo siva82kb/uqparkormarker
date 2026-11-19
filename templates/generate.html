@@ -13,13 +13,13 @@
 <section class="figures">
   <div class="figure">
     <span class="figure-label">Clips</span>
-    <span class="figure-value" id="clip-total">{{ progress.total or sampling.n_segments }}</span>
-    <span class="figure-note">at most {{ sampling.n_segments }} per subject</span>
+    <span class="figure-value" id="clip-total">{{ progress.total or clip_limit or sampling.n_segments }}</span>
+    <span class="figure-note">{% if clip_limit %}test limit of {{ clip_limit }}; the full set is {{ sampling.n_segments }}{% else %}at most {{ sampling.n_segments }} per subject{% endif %}</span>
   </div>
   <div class="figure">
     <span class="figure-label">Clip length</span>
     <span class="figure-value">{{ '%g' | format(sampling.window_seconds) }} s</span>
-    <span class="figure-note">{{ sampling.frames_per_clip }} frames, each clip inside a single video</span>
+    <span class="figure-note">a fixed number of frames, inside a single video</span>
   </div>
   <div class="figure">
     <span class="figure-label">Sampling</span>

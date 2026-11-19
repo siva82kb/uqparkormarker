@@ -42,16 +42,23 @@ def write_plan(subject: str, segments: list[Segment]) -> None:
 
 
 def read_segments(subject: str) -> list[Segment]:
-    """The recorded windows; empty if none have been drawn yet."""
+    """The clips to work with; empty if none have been chosen yet.
+
+    Normally every row of segments.csv. While testing, `clip_limit` in
+    local.toml cuts this to the first few, so the rest of the app (cutting,
+    progress, annotation) behaves as if those were all there is.
+    """
     path = folder(subject) / SEGMENTS_FILE
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as fh:
-        return [
+        segments = [
             Segment(**{**row, "start_frame": int(row["start_frame"]),
                        "end_frame": int(row["end_frame"])})
             for row in csv.DictReader(fh)
         ]
+    limit = (config.load_local() or {}).get("clip_limit")
+    return segments[:limit] if limit else segments
 
 
 def missing(subject: str, segments: list[Segment]) -> list[Segment]:

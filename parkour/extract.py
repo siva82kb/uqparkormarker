@@ -13,7 +13,7 @@ from pathlib import Path
 
 import imageio_ffmpeg
 
-from . import clipset, dataset, sampling
+from . import clipset, dataset, loader, sampling
 from .sampling import Segment
 
 
@@ -54,7 +54,7 @@ def ensure_running(subject: str, subject_dir: Path, study: dict) -> None:
         if _progress.state == "running":
             return
         _set(subject=subject, state="running", done=0, total=0, error="",
-             message="Reading the videos and choosing windows…")
+             message="Reading the videos…")
     threading.Thread(
         target=_run, args=(subject, Path(subject_dir), study), daemon=True
     ).start()
@@ -69,8 +69,12 @@ def _run(subject: str, subject_dir: Path, study: dict) -> None:
     try:
         segments = clipset.read_segments(subject)
         if not segments:        # first run: the plan is written before any cutting
-            offset = study["source"]["utc_offset_hours"]
-            segments = sampling.draw(dataset.load_videos(subject_dir, offset), study)
+            recording = loader.fetch(
+                subject_dir, study["source"]["utc_offset_hours"], _report_reading
+            )
+            with _lock:
+                _set(message="Choosing the windows…")
+            segments = sampling.draw(recording.videos, study)
             clipset.write_plan(subject, segments)
 
         todo = clipset.missing(subject, segments)
@@ -87,7 +91,7 @@ def _run(subject: str, subject_dir: Path, study: dict) -> None:
                 ))
             source = dataset.video_path(subject_dir, segment.video_file)
             if segment.video_file not in rates:
-                rates[segment.video_file] = dataset.avi_frame_rate(source)
+                rates[segment.video_file] = dataset.avi_header(source)[1]
             cut(ffmpeg, source, clipset.clip_path(subject, segment.segment_id),
                 segment, rates[segment.video_file], crf)
 
@@ -97,6 +101,11 @@ def _run(subject: str, subject_dir: Path, study: dict) -> None:
     except Exception as problem:    # shown on the page; the next start resumes
         with _lock:
             _set(state="failed", error=str(problem), message="Stopped.")
+
+
+def _report_reading(done: int, total: int) -> None:
+    with _lock:
+        _set(message=f"Reading video {done} of {total} before choosing windows…")
 
 
 def _time_left(started: float, cut_so_far: int, to_cut: int) -> str:

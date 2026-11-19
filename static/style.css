@@ -363,6 +363,150 @@ tbody tr:hover { background: var(--accent-soft); }
   font-family: ui-monospace, Consolas, monospace;
   font-size: 0.9em;
 }
+/* ---- Site navigation ---- */
+
+.site-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 28px; }
+
+.site-nav { display: flex; gap: 20px; }
+
+.site-nav a {
+  color: #fff;
+  opacity: 0.8;
+  font: 500 0.8rem var(--heading);
+  text-decoration: none;
+}
+.site-nav a:hover, .site-nav a[aria-current] { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---- Timing pages: reading text beside wide figures ---- */
+
+h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 26px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.steps a {
+  padding: 8px 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--ink-soft);
+  font: 600 0.8rem var(--heading);
+  text-decoration: none;
+}
+.steps a:hover { color: var(--ink); }
+.steps a[aria-current] { color: var(--uq-purple); border-bottom-color: var(--uq-purple); }
+.steps .step-number { margin-right: 6px; font-weight: 500; opacity: 0.7; }
+
+.prose { max-width: 680px; }
+.prose p, .prose ul, .prose ol { margin: 0 0 10px; font-size: 1.02rem; line-height: 1.55; }
+.prose ul, .prose ol { padding-left: 20px; }
+.prose li { margin-bottom: 4px; }
+.prose h2 { margin-bottom: 10px; }
+.example {                      /* a worked example, set apart */
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+.example p:last-child { margin-bottom: 0; }
+
+.fig { margin: 16px 0 0; }
+.fig figcaption { max-width: 680px; margin-top: 8px; color: var(--ink-soft); font-size: 0.9rem; }
+.fig figcaption strong { color: var(--ink); font-weight: 600; }
+.fig-source {                   /* says whether a picture is made up or measured */
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-soft);
+  font: 600 0.68rem var(--heading);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.fig-source.measured { border-color: var(--uq-purple); color: var(--uq-purple); }
+
+.pager { display: flex; justify-content: space-between; gap: 16px; margin-top: 34px; }
+
+/* ---- Diagrams and charts (SVG) ---- */
+
+:root {
+  --late: #b84a00;              /* late timestamps and removed frames, everywhere */
+  --late-soft: #fbeee4;
+}
+
+.swatch-late { background: var(--late); }
+.swatch-kept { background: var(--neutral); }
+.swatch-line { height: 2px; border-radius: 0; outline: 0; background: var(--uq-purple); }
+
+.diagram { display: block; width: 100%; height: auto; overflow: visible; }
+.diagram text { font: 12.5px var(--sans); fill: var(--ink-soft); }
+.diagram .t-strong { font: 600 12.5px var(--heading); fill: var(--ink); }
+.diagram .t-small { font-size: 11.5px; }
+.diagram .t-late { fill: var(--late); font-weight: 600; }
+.diagram .t-num { font-variant-numeric: tabular-nums; }
+.diagram .grid { stroke: var(--line); stroke-width: 1; }
+.diagram .rule { stroke: var(--ink-soft); stroke-width: 1; }
+.diagram .mark { fill: var(--neutral); }
+.diagram .mark-late { fill: var(--late); }
+.diagram .link { stroke: var(--neutral); stroke-width: 1; }
+.diagram .link-late { stroke: var(--late); stroke-width: 1.25; }
+.diagram .wash-late { fill: var(--late-soft); }
+.diagram .series { fill: none; stroke: var(--uq-purple); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.diagram .box { fill: var(--surface); stroke: var(--uq-grey); stroke-width: 1; }
+.diagram .box-accent { fill: var(--accent-soft); stroke: var(--uq-purple); stroke-width: 1; }
+.diagram .arrow { fill: none; stroke: var(--ink-soft); stroke-width: 1.25; }
+.diagram .arrow-accent { fill: none; stroke: var(--uq-purple); stroke-width: 1.25; }
+.diagram .bracket { fill: none; stroke: var(--ink-soft); stroke-width: 1; }
+.diagram .bracket-late { fill: none; stroke: var(--late); stroke-width: 1.5; }
+.diagram .bracket-kept { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.diagram .hit { fill: transparent; }
+.diagram .hit:hover { fill: rgba(81, 36, 122, 0.08); }
+
+.readout { margin: 4px 0 0; min-height: 1.45em; color: var(--ink-soft); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.readout.live { color: var(--ink); }
+
+/* ---- Whole-session chart (HTML, shares the timeline's positions) ---- */
+
+.session-plot { position: relative; height: 150px; margin-top: 6px; border-bottom: 1px solid var(--uq-grey); }
+.session-grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
+.session-grid span { position: absolute; left: 0; bottom: 1px; color: var(--ink-soft); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.session-col { position: absolute; top: 0; bottom: 0; }
+.session-col i { position: absolute; left: 0; right: 1px; bottom: 0; min-height: 1px; background: var(--uq-purple); border-radius: 2px 2px 0 0; }
+.session-col:hover { background: var(--accent-soft); }
+.strip-label { margin: 8px 0 2px; color: var(--ink-soft); font-size: 0.78rem; }
+.strip { position: relative; height: 12px; border-radius: 2px; background: #f4f1ef; overflow: hidden; }
+.strip .span-late { background: var(--late); min-width: 2px; }
+.timeline.thin { height: 12px; border-radius: 2px; opacity: 0.75; }
+
+/* ---- Share bars ---- */
+
+.bands { display: grid; grid-template-columns: max-content 1fr max-content max-content; gap: 5px 12px; align-items: center; font-variant-numeric: tabular-nums; }
+.band-track { height: 10px; }
+.band-fill { display: block; height: 100%; min-width: 1px; border-radius: 0 4px 4px 0; background: var(--neutral); }
+.band-fill.late { background: var(--late); }
+.band-fill.empty { min-width: 0; }
+.band-value { text-align: right; }
+.bands .dim { text-align: right; font-size: 0.85rem; }
+
+/* ---- For and against ---- */
+
+.verdicts { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.verdicts li { position: relative; padding: 7px 0 7px 22px; border-bottom: 1px solid var(--line); }
+.verdicts li::before { position: absolute; left: 0; top: 6px; font: 600 1rem var(--heading); }
+.verdicts.for li::before { content: "+"; color: var(--uq-purple); }
+.verdicts.against li::before { content: "\2212"; color: var(--late); }
+.verdicts strong { font-weight: 600; }
+
+td.wrap, th.wrap { white-space: normal; }
+.chosen { background: var(--accent-soft); }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 9px; background: var(--uq-purple); color: #fff; font: 600 0.68rem var(--heading); letter-spacing: 0.06em; text-transform: uppercase; }
+.table-scroll { overflow-x: auto; }
+
 /* ---- Narrow screens ---- */
 
 @media (max-width: 900px) {

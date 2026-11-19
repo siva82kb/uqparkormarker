@@ -10,3 +10,12 @@ def duration(seconds: float) -> str:
         return f"{minutes} min {secs:02d} s"
     hours, minutes = divmod(minutes, 60)
     return f"{hours} h {minutes:02d} min"
+
+
+def share(fraction: float) -> str:
+    """A fraction as a percentage that keeps small values visible: '97.5%', '0.03%'."""
+    if fraction <= 0:
+        return "0%"
+    if fraction < 0.0001:
+        return "under 0.01%"
+    return f"{fraction:.2%}" if fraction < 0.01 else f"{fraction:.1%}"

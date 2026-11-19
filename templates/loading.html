@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Reading videos · {{ subject }}{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block content %}
+<p class="eyebrow">Reading videos</p>
+<h1>{{ subject }}</h1>
+<p class="lead">
+  Reading the frame timestamps of every video. From a network drive this
+  takes about a minute; it is done once each time the app starts.
+</p>
+
+<section>
+  <div class="section-head">
+    <h2>Progress</h2>
+    <p class="progress-count"><span id="progress-count">{{ progress.done }} of {{ progress.total or '…' }}</span></p>
+  </div>
+  <div class="progress" id="progress" role="progressbar" aria-label="Videos read"
+       aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.done }}"
+       data-status-url="{{ url_for('summary_status') }}" data-reload-when-done>
+    <div class="progress-fill" id="progress-fill"
+         style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+  </div>
+  <p class="progress-message" id="progress-message" aria-live="polite">{{ progress.message or 'Starting…' }}</p>
+  <p class="progress-error" id="progress-error" {% if not progress.error %}hidden{% endif %}>{{ progress.error }}</p>
+</section>
+
+<section>
+  <h2>Folder</h2>
+  <dl class="facts">
+    <div><dt>Source videos</dt><dd class="path">{{ source }}</dd></div>
+  </dl>
+</section>
+{% endblock %}

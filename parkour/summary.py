@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from statistics import median
 
+from . import timing
 from .dataset import Video
 
 GAP_SECONDS = 1.0          # report silences between files longer than this
@@ -71,22 +72,13 @@ def duration(video: Video) -> float:
     return (video.times[-1] - video.times[0]) / 1e6
 
 
-def count_windows(videos: list[Video], window_seconds: float) -> int:
-    """How many non-overlapping windows fit, each wholly inside one video."""
-    return sum(int(duration(v) // window_seconds) for v in videos)
-
-
-def build(
-    videos: list[Video],
-    window_seconds: float,
-    utc_offset_hours: float,
-    missing: list[str] = (),
-) -> Summary:
+def build(videos: list[Video], study: dict, missing: list[str] = ()) -> Summary:
     """`missing` names videos the experiment record lists but the folder lacks."""
     usable = [v for v in videos if v.times]   # timed videos, in recording order
-    zone = timezone(timedelta(hours=utc_offset_hours))
+    zone = timezone(timedelta(hours=study["source"]["utc_offset_hours"]))
+    windows = _windows(usable, study)
     rates = [(len(v.times) - 1) / duration(v) for v in usable if duration(v) > 0]
-    timeline = _timeline(usable)
+    spans = timeline(usable)
     start = _local(usable[0].times[0], zone) if usable else None
     end = _local(max(v.times[-1] for v in usable), zone) if usable else None
 
@@ -100,20 +92,57 @@ def build(
         fps_median=median(rates) if rates else None,
         fps_min=min(rates) if rates else None,
         fps_max=max(rates) if rates else None,
-        gaps=[s for s in timeline if s.kind == "gap"],
-        problems=_missing_note(missing) + _problems(videos),
+        gaps=[s for s in spans if s.kind == "gap"],
+        problems=_missing_note(missing) + _problems(videos) + windows.notes,
         tasks=_task_table(usable),
-        timeline=timeline,
-        ticks=_ticks(start, end) if usable else [],
-        n_windows=count_windows(usable, window_seconds),
+        timeline=spans,
+        ticks=ticks(start, end) if usable else [],
+        n_windows=windows.fitting,
     )
+
+
+@dataclass
+class _Windows:
+    fitting: int            # non-overlapping windows with trustworthy timestamps
+    notes: list[str]        # what the timestamp rule leaves out
+
+
+def _windows(usable: list[Video], study: dict) -> _Windows:
+    """Count the windows that can be sampled, and say what the rule excludes."""
+    seconds = study["sampling"]["window_seconds"]
+    max_step = study["timing"]["max_step_seconds"]
+    fitting = possible = allowed = 0
+    per_task: dict[int, int] = defaultdict(int)
+    for v in usable:
+        frames = timing.frames_per_window(v, seconds)
+        starts = timing.clean_starts(v, frames, max_step)
+        fits = timing.count_fitting(starts, frames)
+        fitting += fits
+        allowed += len(starts)
+        possible += max(0, len(v.times) - frames + 1) if frames >= 2 else 0
+        if v.is_task:
+            per_task[v.task_number] += fits
+
+    notes = []
+    if possible > allowed:
+        empty = sum(n == 0 for n in per_task.values())
+        note = (
+            f"{1 - allowed / possible:.1%} of possible {seconds:g} s windows are left "
+            "out of sampling because they contain a repeated timestamp or a pause "
+            f"longer than {max_step:g} s, which mark frames that were stamped late."
+        )
+        if empty:
+            verb = "has" if empty == 1 else "have"
+            note += f" {empty} of the {len(per_task)} tasks {verb} no usable window."
+        notes.append(note)
+    return _Windows(fitting, notes)
 
 
 def _local(microseconds: int, zone: timezone) -> datetime:
     return datetime.fromtimestamp(microseconds / 1e6, zone)
 
 
-def _ticks(start: datetime, end: datetime) -> list[tuple[str, float]]:
+def ticks(start: datetime, end: datetime) -> list[tuple[str, float]]:
     """Clock marks along the strip, on round minutes, about six at most."""
     total = (end - start).total_seconds()
     if total <= 0:
@@ -128,7 +157,7 @@ def _ticks(start: datetime, end: datetime) -> list[tuple[str, float]]:
     return ticks
 
 
-def _timeline(usable: list[Video]) -> list[Span]:
+def timeline(usable: list[Video]) -> list[Span]:
     """Videos and the gaps between them, placed along the whole recording."""
     if not usable:
         return []
@@ -162,11 +191,11 @@ def _task_table(usable: list[Video]) -> list[TaskRow]:
         if v.is_task:
             seconds[v.task_number] += duration(v)
             repeats[v.task_number] += 1
-            names[v.task_number] = _task_title(v)
+            names[v.task_number] = task_title(v)
     return [TaskRow(n, names[n], seconds[n], repeats[n]) for n in sorted(seconds)]
 
 
-def _task_title(video: Video) -> str:
+def task_title(video: Video) -> str:
     """'03:Tie shoelaces' -> 'Tie shoelaces'; the number has its own column."""
     name = video.task_name or ""
     return name.split(":", 1)[-1].strip() or "(no name)"
@@ -201,13 +230,8 @@ def _problems(videos: list[Video]) -> list[str]:
             )
         steps = [b - a for a, b in zip(v.times, v.times[1:])]
         backward = sum(s < 0 for s in steps)
-        repeated = sum(s == 0 for s in steps)
         if backward:
             found.append(f"{v.name}: timestamps go backwards in {backward} places.")
-        if repeated:
-            found.append(
-                f"{v.name}: {repeated} frames repeat the previous frame's timestamp."
-            )
         drift = abs(v.times[0] - v.filename_time) / 1e6
         if drift > NAME_DRIFT_SECONDS:
             found.append(

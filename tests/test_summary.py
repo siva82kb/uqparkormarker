@@ -8,6 +8,12 @@ from parkour.dataset import Video
 
 SECOND = 1_000_000
 
+STUDY = {
+    "source": {"utc_offset_hours": 10},
+    "timing": {"max_step_seconds": 0.3},
+    "sampling": {"strategy": "uniform", "n_segments": 20, "window_seconds": 1.0, "seed": 7},
+}
+
 
 def video(name, start_s, n_frames, task=None, step=SECOND // 10, **changes):
     """A video of n_frames at 10 fps starting start_s seconds after the epoch."""
@@ -18,6 +24,7 @@ def video(name, start_s, n_frames, task=None, step=SECOND // 10, **changes):
         task_name=f"{task:02d}:Task {task}" if task is not None else None,
         filename_time=times[0] if times else start_s * SECOND,
         frame_count=n_frames,
+        frame_rate=1_000_000 / step,
         times=times,
     )
     return Video(**{**fields, **changes})
@@ -30,7 +37,7 @@ class Build(unittest.TestCase):
             video("task_000_2", 10, 51, task=0),        # 10 to 15 s, no gap
             video("task_000_3", 20, 26, task=0),        # 20 to 22.5 s, 5 s gap
         ]
-        self.summary = summary.build(self.videos, 1.0, 10)
+        self.summary = summary.build(self.videos, STUDY)
 
     def test_counts_and_durations(self):
         s = self.summary
@@ -45,6 +52,7 @@ class Build(unittest.TestCase):
         self.assertAlmostEqual(self.summary.gaps[0].seconds, 5.0)
 
     def test_windows_stay_inside_one_video(self):
+        # 101, 51 and 26 frames hold 10, 5 and 2 windows of 10 frames.
         self.assertEqual(self.summary.n_windows, 10 + 5 + 2)
 
     def test_task_table_merges_repeats(self):
@@ -63,7 +71,7 @@ class Build(unittest.TestCase):
 
 class Problems(unittest.TestCase):
     def problems(self, *videos):
-        return summary.build(list(videos), 1.0, 10).problems
+        return summary.build(list(videos), STUDY).problems
 
     def test_missing_vidt(self):
         (note,) = self.problems(video("a", 0, 10, times=None))
@@ -73,16 +81,30 @@ class Problems(unittest.TestCase):
         (note,) = self.problems(video("a", 0, 10, frame_count=12))
         self.assertIn("12 frames but 10 timestamps", note)
 
-    def test_repeated_and_backward_timestamps(self):
+    def test_backward_timestamps(self):
         v = video("a", 0, 5)
-        v.times[2] = v.times[1]            # repeat
-        v.times[4] = v.times[3] - 1        # backwards
-        notes = " ".join(self.problems(v))
-        self.assertIn("backwards in 1 places", notes)
-        self.assertIn("1 frames repeat", notes)
+        v.times[4] = v.times[3] - 1
+        self.assertIn("backwards in 1 places", " ".join(self.problems(v)))
+
+    def test_windows_left_out_for_late_stamps(self):
+        clean = video("task_000_1", 0, 30, task=0)
+        late = video("task_001_2", 10, 30, task=1)
+        late.times[15] = late.times[14]             # a repeated stamp mid-video
+        s = summary.build([clean, late], STUDY)
+        (note,) = s.problems
+        self.assertIn("left out of sampling", note)
+        self.assertIn("pause longer than 0.3 s", note)
+        self.assertNotIn("no usable window", note)
+        self.assertEqual(s.n_windows, 3 + 2)        # the late video loses one
+
+    def test_task_with_no_usable_window(self):
+        late = video("task_001_2", 10, 12, task=1)
+        late.times[6] = late.times[5]
+        (note,) = self.problems(video("task_000_1", 0, 30, task=0), late)
+        self.assertIn("1 of the 2 tasks has no usable window", note)
 
     def test_listed_but_absent_videos(self):
-        s = summary.build([video("a", 0, 10)], 1.0, 10, ["task_001_5", "unlabelled_x_6"])
+        s = summary.build([video("a", 0, 10)], STUDY, ["task_001_5", "unlabelled_x_6"])
         self.assertIn("2 videos listed", s.problems[0])
         self.assertIn("(1 task, 1 unlabelled)", s.problems[0])
 

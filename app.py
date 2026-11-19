@@ -4,7 +4,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
-from parkour import clipset, config, dataset, extract, fmt, summary
+from parkour import clipset, config, extract, fmt, loader, summary
 
 app = Flask(__name__)
 app.add_template_filter(fmt.duration, "duration")
@@ -30,22 +30,31 @@ def home():
 
 @app.route("/summary")
 def summary_page():
+    """The data summary, or a progress page while the videos are being read."""
     if (setup := _setup()) is None:
         return redirect(url_for("home"))
     local, study, subject_dir = setup
     offset = study["source"]["utc_offset_hours"]
+
+    recording = loader.cached(subject_dir)
+    if recording is None:
+        loader.start(subject_dir, offset)
+        return render_template(
+            "loading.html", subject=local["subject"], source=subject_dir,
+            progress=loader.snapshot(),
+        )
     return render_template(
         "summary.html",
         subject=local["subject"],
-        summary=summary.build(
-            dataset.load_videos(subject_dir, offset),
-            study["sampling"]["window_seconds"],
-            offset,
-            dataset.missing_videos(subject_dir),
-        ),
+        summary=summary.build(recording.videos, study, recording.missing),
         study=study,
         clip_state=clipset.state(local["subject"]),
     )
+
+
+@app.route("/summary/status")
+def summary_status():
+    return jsonify(loader.snapshot())
 
 
 @app.route("/generate", methods=["GET", "POST"])
@@ -77,6 +86,7 @@ def generate_page():
         source=subject_dir,
         folder=clipset.folder(subject),
         progress=extract.snapshot(subject),
+        clip_limit=local.get("clip_limit"),
     )
 
 
