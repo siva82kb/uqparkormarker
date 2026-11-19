@@ -39,6 +39,12 @@ in the app itself, under **Docs**. That is the only copy.
 - **Leave the black window open while you work. Close it to stop the app.**
 - If you double-click `run.bat` while the app is already running, it just
   opens the app in your browser.
+- Only one copy of the app runs at a time. If a copy in a different folder
+  is running, `run.bat` shows that folder and asks whether to close it and
+  start this one. Answer N and nothing changes. Labels are saved at every
+  Next, so closing a copy loses none.
+- If some other program is using the app's address, `run.bat` names the
+  program and stops. Close that program and try again.
 
 Developers who have [uv](https://docs.astral.sh/uv/) can start it from a
 terminal instead: `uv run python app.py`, then open `http://127.0.0.1:5000`.

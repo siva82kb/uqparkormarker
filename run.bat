@@ -19,11 +19,65 @@ set "UV_CACHE_DIR=%RUNTIME%\cache"
 if not defined PARKOUR_PORT set "PARKOUR_PORT=5000"
 set "ADDRESS=http://127.0.0.1:%PARKOUR_PORT%"
 
-rem ---- Is the app already running? Then just open it. ----
-powershell -NoProfile -Command "try { (New-Object Net.Sockets.TcpClient('127.0.0.1', %PARKOUR_PORT%)).Close(); exit 0 } catch { exit 1 }"
-if errorlevel 1 goto :not_running
-echo The app is already running. Opening it in your browser.
+rem ---- What is on the app's port? (run_check.ps1 explains the answers.) ----
+call :look
+if "%ON_STATE%"=="mine" goto :already_running
+if "%ON_STATE%"=="other" goto :other_copy
+if "%ON_STATE%"=="unknown" goto :other_program
+goto :not_running
+
+:already_running
+echo  The app is already running. Opening it in your browser.
 start "" "%ADDRESS%"
+exit /b 0
+
+:other_copy
+rem Only one copy of the app runs at a time, so that there is one address.
+echo.
+echo  Another copy of the app is running, from:
+echo    %ON_FOLDER%
+if defined ON_BUSY echo  It is in the middle of %ON_BUSY%. If you close it, that work
+if defined ON_BUSY echo  stops, and carries on the next time that copy is started.
+echo.
+choice /c YN /n /m " Close it and start this copy instead? (Y/N) "
+if errorlevel 2 goto :kept
+taskkill /PID %ON_PID% /T /F >nul 2>&1
+set "TRIES=0"
+:wait_closed
+call :look
+if "%ON_STATE%"=="free" goto :not_running
+set /a TRIES+=1
+if %TRIES% geq 10 goto :not_closed
+ping -n 2 127.0.0.1 >nul
+goto :wait_closed
+
+:kept
+echo.
+echo  Nothing was changed. The other copy is still running.
+pause
+exit /b 0
+
+:not_closed
+echo.
+echo  The other copy could not be closed. Close its black window, then
+echo  double-click run.bat again.
+pause
+exit /b 1
+
+:other_program
+echo.
+echo  The app cannot start: another program is using its address
+echo  (%ADDRESS%).
+if defined ON_PROGRAM echo  The program is: %ON_PROGRAM%
+echo  Close that program, then double-click run.bat again.
+pause
+exit /b 1
+
+:look
+rem Sets ON_STATE (free, mine, other, unknown) and what goes with it.
+for %%v in (STATE FOLDER PID BUSY PROGRAM) do set "ON_%%v="
+for /f "usebackq tokens=1,* delims==" %%a in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run_check.ps1" %PARKOUR_PORT%`) do set "ON_%%a=%%b"
+if not defined ON_STATE set "ON_STATE=free"
 exit /b 0
 
 :not_running

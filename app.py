@@ -8,7 +8,7 @@ from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_file, url_for)
 
 from parkour import (annotations, clipset, config, dataset, devreload, docs, extract, fmt,
-                     loader, share, shared_ratings, summary, timing_report, transfer)
+                     instance, loader, share, shared_ratings, summary, timing_report, transfer)
 
 app = Flask(__name__)
 app.add_template_filter(fmt.duration, "duration")
@@ -36,6 +36,12 @@ def dev_stamp():
     if not app.config.get("DEV"):
         abort(404)
     return jsonify(stamp=devreload.stamp())
+
+
+@app.route("/whoami")
+def whoami():
+    """For run.bat: which copy of the app is answering on this port."""
+    return jsonify(instance.describe())
 
 
 def _setup():

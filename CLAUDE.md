@@ -160,6 +160,12 @@ the sync to the sensors remain to be done.
   nothing is installed elsewhere. It must keep Windows line endings
   (`.gitattributes`). `PARKOUR_PORT` changes the port, for testing a second
   copy beside the first.
+- One copy of the app runs at a time, on one port. Before starting,
+  `run.bat` asks the port which copy is there (`run_check.ps1`, the
+  `/whoami` address, `parkour/instance.py`): the same folder opens the
+  browser; another folder is closed only if the person says yes; a program
+  that is not the app is never closed. Do not make `run.bat` pick another
+  port by itself.
 - Tests: `uv run python -m unittest discover -s tests -t .`
 - `uv run python app.py --dev` reloads the open page when any app file is
   saved (`parkour/devreload.py`). Development only; raters run without it.

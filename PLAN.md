@@ -691,8 +691,14 @@ packages the raters will get. `uv.lock` is committed.
 7. `run.bat` (done). Double-click to start. On first start it downloads uv
    into `.runtime/`, and through it Python and the packages, also into
    `.runtime/`, so nothing is installed elsewhere; then it starts the app and
-   opens the browser when the app answers. If the app is already running it
-   only opens the browser. `.gitattributes` keeps its Windows line endings,
+   opens the browser when the app answers. One copy runs at a time, on one
+   port. Before starting, `run.bat` asks whatever is on the port which copy
+   it is (`run_check.ps1` asks the app's `/whoami` address, answered by
+   `parkour/instance.py`): this copy, so only the browser is opened; a copy
+   in another folder, so the folder is shown and the person is asked whether
+   to close it and start this one (and told if it is in the middle of slow
+   work); or a program that is not the app, which is named and never
+   closed. `.gitattributes` keeps its Windows line endings,
    including in a ZIP downloaded from GitHub. Rater instructions are in the
    README.
 8. First-run test (done once, on the development computer): a fresh copy of
