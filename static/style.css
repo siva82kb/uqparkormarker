@@ -365,6 +365,51 @@ tbody tr:hover { background: var(--accent-soft); }
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Setup, sharing and upload results ---- */
+
+.steps { margin: 0; padding-left: 20px; }
+.steps li + li { margin-top: 4px; }
+
+.choice-note { margin: 0; color: var(--ink-soft); font-size: 0.9rem; }
+.signin label[for="subject"] { margin-top: 10px; }
+
+.signin select {
+  padding: 10px 12px;
+  border: 1px solid var(--uq-grey);
+  border-radius: 4px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 1rem;
+}
+.signin select:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 1px; border-color: var(--uq-purple); }
+
+.name-verdict { margin: 0; min-height: 1.45em; color: var(--ink-soft); font-size: 0.9rem; }
+.name-verdict.field-error { color: var(--uq-purple); }
+.button[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* A button whose form has been sent and is waiting for the answer. */
+.button.busy { opacity: 1; cursor: progress; display: inline-flex; align-items: center; gap: 10px; }
+.button.busy::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.button-quiet.busy::before { border-color: rgba(81, 36, 122, 0.3); border-top-color: var(--uq-purple); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .button.busy::before { animation-duration: 2.4s; } }
+.busy-note { margin: 0; color: var(--ink-soft); font-size: 0.85rem; }
+
+.hero-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sharing-note { margin: 8px 0 0; color: var(--ink-soft); font-size: 0.9rem; }
+.sharing-note strong { color: var(--ink); }
+
+.outcome { margin: 0 0 8px; padding: 10px 14px; border-left: 3px solid var(--uq-neutral); background: var(--accent-soft); }
+.outcome-good { border-left-color: var(--uq-purple); }
+
 /* ---- Signs of life beside the status text ---- */
 
 .pulse {                         /* a small dot that breathes while work goes on */
@@ -678,7 +723,15 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 .contents-link:hover { text-decoration: underline; }
 .contents-about { color: var(--ink-soft); }
 
-.prose { max-width: 680px; }
+/* One reading width for a docs page: text, boxes, lists and simple tables
+   all end at the same right edge. Only charts, diagrams and side-by-side
+   layouts (.pair, .table-scroll) use the full width. */
+:root { --measure: 720px; }
+.prose { max-width: var(--measure); }
+.doc-main section > table,
+.doc-main section > pre,
+.doc-main section > p,
+.doc-main section > .problems { max-width: var(--measure); }
 .prose p, .prose ul, .prose ol { margin: 0 0 10px; font-size: 1.02rem; line-height: 1.55; }
 .prose ul, .prose ol { padding-left: 20px; }
 .prose li { margin-bottom: 4px; }
@@ -692,7 +745,7 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 .example p:last-child { margin-bottom: 0; }
 
 .fig { margin: 16px 0 0; }
-.fig figcaption { max-width: 680px; margin-top: 8px; color: var(--ink-soft); font-size: 0.9rem; }
+.fig figcaption { max-width: var(--measure); margin-top: 8px; color: var(--ink-soft); font-size: 0.9rem; }
 .fig + .prose { margin-top: 14px; }
 .fig figcaption strong { color: var(--ink); font-weight: 600; }
 .fig-source {                   /* says whether a picture is made up or measured */
@@ -708,6 +761,9 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 }
 .fig-source.measured { border-color: var(--uq-purple); color: var(--uq-purple); }
 
+
+.tree-title { margin: 16px 0 0; font-size: 1.02rem; }
+.code.tree { margin: 6px 0 10px; line-height: 1.5; }   /* a folder and its files */
 
 /* ---- Diagrams and charts (SVG) ---- */
 

@@ -5,11 +5,14 @@ study videos. It draws random 1-second windows from a participant's videos,
 cuts them into short clips, and shows them one at a time to a rater, who
 assigns each clip a FAABOS category.
 
-Everything runs on the rater's own computer. Nothing is uploaded.
+Everything runs on the rater's own computer. Clips and finished ratings are
+shared between raters through the study's own research data storage (the
+RDM), and nowhere else.
 
-**Status: under construction.** The data summary, clip generation, sign-in
-and annotation work. The pages for choosing the data folder and participant
-are not built yet, so those are set by hand (see below). `PLAN.md` has the
+**Status: under construction.** The first-time setup, data summary, clip
+generation, sharing through the RDM, sign-in and annotation work. The way
+clips and ratings are shared is a temporary arrangement for one paper (see
+"ICORR" in `PLAN.md`). `PLAN.md` has the
 design, the decisions made, and the build order. How clips are
 chosen, and what to keep in mind when interpreting the results, is explained
 in the app itself, under **Docs**. That is the only copy.
@@ -25,28 +28,35 @@ in the app itself, under **Docs**. That is the only copy.
 
 ## Starting the app
 
-Until the setup pages exist, tell the app where the data is by creating a
-file named `local.toml` next to `app.py`:
-
-```toml
-data_source = "videos"
-source_dir = "X:/path/to/the/folder/holding/the/participant/folders"
-subject = "Pxx"
-```
-
-While testing, you can add `clip_limit = 25` to `local.toml`. The app then
-works with only the first 25 clips, which matters because cutting clips from
-the RDM over the VPN takes about half a minute each (several hours for 500).
-The full list of 500 is still drawn and saved; remove the line to cut the
-rest.
-
-Then, in a terminal in this folder:
+In a terminal in this folder:
 
 ```
 uv run python app.py
 ```
 
 and open `http://127.0.0.1:5000`.
+
+The first time, the app asks one question: **where is the study folder?**
+Connect to the VPN if you are off campus, make sure the RDM is open as a
+drive, and paste the path of the study folder. The app remembers it in a file
+named `local.toml`, next to `app.py`.
+
+What happens next depends on what the app finds:
+
+- **Clips are already on this computer:** it goes to labelling.
+- **Clips for the participant are on the RDM:** it copies them to this
+  computer, showing progress, and then goes to labelling.
+- **Neither:** it reads the videos, shows the data summary, and offers to
+  generate the clips.
+
+If the study folder cannot be reached, the app says so and waits for you to
+connect. It changes nothing.
+
+For developers: while testing, add `clip_limit = 25` to `local.toml`. The app
+then works with only the first 25 clips, which matters because cutting clips
+from the RDM over the VPN can take half a minute each. The full list is still
+drawn and saved; remove the line to cut the rest. Clips cannot be uploaded to
+the RDM while this setting is on.
 
 ## What the app does today
 
@@ -80,6 +90,32 @@ and open `http://127.0.0.1:5000`.
 5. **Shows the clips one at a time for labelling**, in an order that is
    shuffled differently for each rater.
 
+## Sharing clips and ratings through the RDM
+
+Every rater labels the same clips. They are shared through one folder inside
+the study folder on the RDM (its name is set in `study.toml`):
+
+```
+ICORR27 Annotate/
+    clips/Pxx/Pxx_clips.zip      the clips, the list of clips, the settings,
+                                 and the saved reading of the videos
+    ratings/Pxx_<rater>_annotations_<date-time>.csv
+```
+
+- **Uploading clips.** After generating clips, the page shows an "Upload to
+  RDM" button if the RDM has no clips for that participant yet. Clips already
+  on the RDM are never replaced.
+- **Getting clips.** A rater's app fetches the zip by itself on first start.
+- **Ratings.** When a rater has labelled every clip, the app copies their
+  label file to `ratings`, with the date and time in the name. Nothing is
+  pressed. An earlier upload is never replaced; the most recent file for a
+  rater is the one that counts, and the app says when an earlier one exists.
+- **Names.** The sign-in page says, as you type, if a name is already used by
+  another rater. If two raters still end up with the same name, the app adds
+  a three-digit number at upload and tells the rater. **Do all your labelling
+  on one computer:** the app recognises a rater by the computer they use.
+- **If the RDM cannot be reached,** the app says so and tries again the next
+  time the page is opened. Labels stay safe on the rater's computer.
 ## Labelling clips
 
 Each clip plays in a loop. Under it are the five labels, numbered 1 to 5.
@@ -181,5 +217,10 @@ and new clips must not be mixed. Run `reset.py` (above) to clear the old ones.
 ## For developers
 
 - Run everything through `uv`: `uv run python app.py`.
+- While changing the app, start it with `uv run python app.py --dev`. The
+  open page then reloads by itself whenever a template, the stylesheet, the
+  script, `study.toml` or the Python code is saved. The server restarts on
+  a change to the code, which stops any clip generation in progress (it
+  resumes when the page is opened again). Raters do not use `--dev`.
 - Tests: `uv run python -m unittest discover -s tests -t .`
 - Code layout and conventions: `PLAN.md` section 7 and `CLAUDE.md`.

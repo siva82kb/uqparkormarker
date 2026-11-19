@@ -3,7 +3,58 @@
 {% block content %}
 <p class="eyebrow">Finished</p>
 <h1>All {{ total }} clips are labelled</h1>
-<p class="lead">Thank you. Your labels for {{ subject }} are saved; there is nothing more to do.</p>
+<p class="lead">Thank you. Your labels for {{ subject }} are saved on this computer.</p>
+
+{# What happened when the app tried to copy the labels to the RDM. #}
+<section>
+  <h2>Sharing your labels</h2>
+  {% set when = uploaded.at.strftime('%d %B %Y at %H:%M').lstrip('0') if uploaded.at else '' %}
+  {% if uploaded.status == 'uploaded' %}
+  <p class="outcome outcome-good">
+    <strong>Your labels have been uploaded to the RDM.</strong> There is nothing more to do.
+  </p>
+  {% if uploaded.renamed %}
+  <p class="outcome outcome-note">
+    Another rater was already using the name <strong>{{ rater }}</strong>, so your
+    labels were uploaded under the name <strong>{{ uploaded.name }}</strong>.
+    Please make a note of it, and keep using this computer for your labelling.
+  </p>
+  {% endif %}
+  {% if uploaded.previous %}
+  <p class="outcome outcome-note">
+    Labels from you were already on the RDM, uploaded on
+    {{ uploaded.previous.strftime('%d %B %Y at %H:%M').lstrip('0') }}. They have
+    been kept. The labels uploaded just now are the most recent, and are the
+    ones that count.
+  </p>
+  {% endif %}
+  {% elif uploaded.status == 'unchanged' %}
+  <p class="outcome outcome-good">
+    <strong>Your labels are on the RDM</strong>, uploaded on {{ when }}
+    {% if uploaded.name != rater %}under the name <strong>{{ uploaded.name }}</strong>{% endif %}.
+    Nothing has changed since, so nothing was uploaded again.
+  </p>
+  {% elif uploaded.status == 'unreachable' %}
+  <p class="outcome outcome-note">
+    <strong>Your labels could not be uploaded, because the RDM cannot be reached.</strong>
+    They are safe on this computer. Connect to the VPN and the drive, then
+    reload this page; the app will try again.
+  </p>
+  {% elif uploaded.status == 'no_clips' %}
+  <p class="outcome outcome-note">
+    <strong>Your labels have not been uploaded yet</strong>, because these clips
+    are not on the RDM. Share the clips first, with "Upload to RDM" on the
+    <a class="link" href="{{ url_for('generate_page') }}">clips page</a>, then come back here.
+  </p>
+  {% else %}
+  <p class="outcome outcome-note">
+    <strong>Your labels were not uploaded.</strong> The clips on this computer
+    are not the ones shared on the RDM, so these labels belong to different
+    clips. To label the shared clips, stop the app and run
+    <code>uv run python reset.py</code>.
+  </p>
+  {% endif %}
+</section>
 
 <section>
   <h2>Your labels</h2>

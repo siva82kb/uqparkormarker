@@ -76,6 +76,18 @@ def list_subjects(source: Path) -> list[str]:
     )
 
 
+def subject_names(source: Path) -> list[str]:
+    """Folders in `source` named like a participant (P plus digits). One
+    listing of the folder, so it is quick even on the network drive; it does
+    not look inside them (see `has_videos` for that)."""
+    return sorted(name for name in os.listdir(source) if SUBJECT.match(name))
+
+
+def has_videos(source: Path, subject: str) -> bool:
+    """Does this participant have videos directly in a Video folder?"""
+    return _has_flat_videos(Path(source) / subject / VIDEO_DIR)
+
+
 def _has_flat_videos(video_dir: Path) -> bool:
     """True if the folder holds .avi files and no subfolders."""
     if not video_dir.is_dir():

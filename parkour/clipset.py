@@ -26,6 +26,7 @@ SEGMENTS_FILE = "segments.csv"
 DESIGN_FILE = "design.toml"
 CLIP_DIR = "clips"
 SPENT_FILE = "generation_time.json"     # time spent generating, over every run
+NOT_DESIGN = ("share",)     # sections of study.toml that do not affect how clips are made
 
 
 def folder(subject: str) -> Path:
@@ -179,13 +180,50 @@ def design_differences(subject: str, study: dict) -> list[str]:
     if not path.exists():
         return []
     with path.open("rb") as fh:
-        then, now = _flatten(tomllib.load(fh)), _flatten(study)
+        return differences(tomllib.load(fh), study)
+
+
+def differences(design: dict, study: dict) -> list[str]:
+    """Settings that differ between the design clips were made with and the
+    study settings. Settings that say nothing about how clips are made
+    (NOT_DESIGN) are left out of the comparison."""
+    def relevant(settings: dict) -> dict:
+        flat = _flatten(settings)
+        return {key: value for key, value in flat.items()
+                if key.split(".")[0] not in NOT_DESIGN}
+
+    then, now = relevant(design), relevant(study)
     return [
         f"{key}: clips were made with {then.get(key, 'nothing')!r}, "
         f"study.toml now has {now.get(key, 'nothing')!r}"
         for key in sorted(then.keys() | now.keys())
         if then.get(key) != now.get(key)
     ]
+
+
+def set_id(subject: str) -> str:
+    """A code that is the same wherever the same set of clips is, and
+    different for any other set. Made from the list of clips and the design
+    they were made with (not from when or where the files were written, so it
+    survives being zipped, copied and unpacked). Used to tell whether the
+    clips on this computer are the ones shared on the RDM. Empty if no clips
+    have been chosen yet.
+
+    Not to be confused with `set_code`, which changes on every generation and
+    exists to keep browsers from showing an old clip.
+    """
+    plan, design = folder(subject) / SEGMENTS_FILE, folder(subject) / DESIGN_FILE
+    if not plan.exists() or not design.exists():
+        return ""
+    return content_id(plan.read_bytes(), design.read_bytes())
+
+
+def content_id(segments_csv: bytes, design_toml: bytes) -> str:
+    """The set id for a list of clips and a design, given as file contents.
+    Line endings are ignored, since copying between computers can change them."""
+    stamp = hashlib.sha256(segments_csv.replace(b"\r\n", b"\n"))
+    stamp.update(b"\0" + design_toml.replace(b"\r\n", b"\n"))
+    return stamp.hexdigest()[:12]
 
 
 def _flatten(value, prefix: str = "") -> dict:

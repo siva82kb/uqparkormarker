@@ -8,19 +8,29 @@
   other rater's.
 </p>
 
-<form class="signin" method="post" action="{{ url_for('signin_page') }}">
+{# The line under the box is filled in as a name is typed: the script asks
+   the app whether the name is free. The same check is made again when the
+   form is sent, so it does not depend on the script. #}
+<form class="signin" id="signin" method="post" action="{{ url_for('signin_page') }}"
+      data-check-url="{{ url_for('signin_check') }}">
   <label for="name">Your name</label>
   <input id="name" name="name" type="text" value="{{ typed }}" required autofocus
-         autocomplete="off" maxlength="60" {% if rejected %}aria-invalid="true" aria-describedby="name-error"{% endif %}>
-  {% if rejected %}
-  <p class="field-error" id="name-error">Please use at least one letter or number.</p>
-  {% endif %}
-  <button class="button" type="submit">Start</button>
+         autocomplete="off" maxlength="60" aria-describedby="name-verdict"
+         {% if verdict in ('empty', 'taken') %}aria-invalid="true"{% endif %}>
+  <p class="name-verdict {% if verdict in ('empty', 'taken') %}field-error{% endif %}"
+     id="name-verdict" aria-live="polite"
+     data-empty="Please use at least one letter or number."
+     data-taken="That name is already in use by another rater. Please choose another, for example by adding your surname."
+     data-free="That name is free."
+     data-unchecked="The RDM could not be reached, so the name could not be checked. You can go on."
+     >{% if verdict == 'empty' %}Please use at least one letter or number.{% elif verdict == 'taken' %}That name is already in use by another rater. Please choose another, for example by adding your surname.{% endif %}</p>
+  <button class="button" id="signin-start" type="submit">Start</button>
 </form>
 
 <p class="note">
   The name is turned into a simple form for the file name: lower-case letters,
   numbers and underscores, so "Ann Lee" becomes <code>ann_lee</code>. It is
-  asked once on this computer. To change it later, edit <code>local.toml</code>.
+  asked once on this computer, and you should do all your labelling on this
+  computer. To change the name later, edit <code>local.toml</code>.
 </p>
 {% endblock %}

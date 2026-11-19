@@ -1,12 +1,13 @@
 """Flask routes only. All logic lives in the parkour package."""
 
+import sys
 from pathlib import Path
 
 from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_file, url_for)
 
-from parkour import (annotations, clipset, config, docs, extract, fmt, loader,
-                     summary, timing_report)
+from parkour import (annotations, clipset, config, dataset, devreload, docs, extract, fmt,
+                     loader, share, shared_ratings, summary, timing_report, transfer)
 
 app = Flask(__name__)
 app.add_template_filter(fmt.duration, "duration")
@@ -22,10 +23,24 @@ def _who():
     return {"rater": local.get("rater"), "open_subject": local.get("subject")}
 
 
+@app.context_processor
+def _developer_mode():
+    """In developer mode, pages are told where to ask whether files changed."""
+    return {"dev_stamp_url": url_for("dev_stamp") if app.config.get("DEV") else None}
+
+
+@app.route("/dev/stamp")
+def dev_stamp():
+    """Developer mode only: a value that changes when the app's files change."""
+    if not app.config.get("DEV"):
+        abort(404)
+    return jsonify(stamp=devreload.stamp())
+
+
 def _setup():
     """(local settings, study settings, subject's source folder), or None."""
     local = config.load_local()
-    if local is None:
+    if not (local and local.get("source_dir") and local.get("subject")):
         return None
     return local, config.load_study(), Path(local["source_dir"]) / local["subject"]
 
@@ -43,20 +58,116 @@ def _recording(setup):
     )
 
 
+def _is_set_up(local: dict | None) -> bool:
+    return bool(local and local.get("source_dir") and local.get("subject"))
+
+
 @app.route("/")
 def home():
-    """Open on the page that matches the state of the clips."""
+    """Open on the page that matches the state of the clips.
+
+    Clips on this computer come first. If there are none, shared clips on the
+    RDM are fetched. If there are none there either, the videos are read and
+    clips are generated here.
+    """
     local = config.load_local()
-    if local is None:
-        return render_template("setup_pending.html")
-    state = clipset.state(local["subject"])
-    if state == "none":
-        return redirect(url_for("summary_page"))
+    if not _is_set_up(local):
+        return redirect(url_for("setup_page"))
+    subject = local["subject"]
+    state = clipset.state(subject)
     if state == "partial":
         return redirect(url_for("generate_page"))
-    # The clips are ready. The rater's name is asked only now, when labelling
-    # is about to start; nothing before this needs it.
-    return redirect(url_for("annotate_page" if local.get("rater") else "signin_page"))
+    if state == "complete":
+        # The rater's name is asked only now, when labelling is about to
+        # start; nothing before this needs it.
+        return redirect(url_for("annotate_page" if local.get("rater") else "signin_page"))
+    try:
+        on_rdm = share.shared_id(share.root(local, config.load_study()), subject)
+    except share.Unreachable:
+        return render_template("unreachable.html", folder=local["source_dir"])
+    return redirect(url_for("fetch_page" if on_rdm else "summary_page"))
+
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup_page():
+    """First start: ask where the study folder is, and settle the participant.
+
+    The participant is taken from the shared clips on the RDM if there are
+    any (by itself if there is only one), else chosen from the participant
+    folders in the study folder.
+    """
+    if _is_set_up(config.load_local()):
+        return redirect(url_for("home"))
+    typed = request.form.get("folder", "").strip().strip('"')
+    chosen = request.form.get("subject", "")
+    values = dict(typed=typed, problem=None, kind=None, names=[])
+    if request.method == "POST" and typed:
+        source = Path(typed)
+        try:
+            if not share.reachable(source):
+                raise share.Unreachable
+            kind, names = share.candidates(source, source / config.load_study()["share"]["folder"])
+        except share.Unreachable:
+            values["problem"] = "unreachable"
+            return render_template("setup.html", **values)
+        if len(names) == 1 and kind == "shared":
+            chosen = names[0]
+        if chosen in names and (kind == "shared" or dataset.has_videos(source, chosen)):
+            config.set_local("source_dir", str(source))
+            config.set_local("subject", chosen)
+            return redirect(url_for("home"))
+        values.update(kind=kind, names=names,
+                      problem="no_videos" if chosen in names else
+                              "nobody" if not names else None)
+    elif request.method == "POST":
+        values["problem"] = "empty"
+    return render_template("setup.html", **values)
+
+
+@app.route("/fetch", methods=["GET", "POST"])
+def fetch_page():
+    """Download the participant's shared clips from the RDM, with progress.
+    POST tries again after a failure."""
+    local = config.load_local()
+    if not _is_set_up(local) or clipset.state(local["subject"]) != "none":
+        return redirect(url_for("home"))
+    study, subject = config.load_study(), local["subject"]
+    progress = transfer.snapshot("download", subject)
+    if progress["state"] == "idle" or request.method == "POST":
+        folder, subject_dir = share.root(local, study), Path(local["source_dir"]) / subject
+        transfer.start("download", subject,
+                       lambda report: share.unpack(folder, subject, subject_dir, study, report))
+        if request.method == "POST":
+            return redirect(url_for("fetch_page"))
+        progress = transfer.snapshot("download", subject)
+    return render_template("transfer.html", kind="download", subject=subject,
+                           progress=progress, status_url=url_for("transfer_status", kind="download"))
+
+
+@app.route("/upload", methods=["GET", "POST"])
+def upload_page():
+    """POST puts this computer's clips on the RDM as a zip. GET shows how far
+    it has got."""
+    local = config.load_local()
+    if not _is_set_up(local) or clipset.state(local["subject"]) != "complete":
+        return redirect(url_for("home"))
+    study, subject = config.load_study(), local["subject"]
+    if request.method == "POST":
+        folder = share.root(local, study)
+        if share.standing(folder, subject, bool(local.get("clip_limit"))) == "upload":
+            transfer.start("upload", subject, lambda report: share.pack(folder, subject, report))
+        return redirect(url_for("upload_page"))
+    progress = transfer.snapshot("upload", subject)
+    if progress["state"] == "idle":
+        return redirect(url_for("generate_page"))
+    return render_template("transfer.html", kind="upload", subject=subject,
+                           progress=progress, status_url=url_for("transfer_status", kind="upload"))
+
+
+@app.route("/transfer/<kind>/status")
+def transfer_status(kind: str):
+    local = config.load_local()
+    return jsonify(transfer.snapshot(kind, local["subject"]) if _is_set_up(local) else {})
 
 
 @app.route("/signin", methods=["GET", "POST"])
@@ -68,14 +179,34 @@ def signin_page():
             or clipset.state(local["subject"]) != "complete"):
         return redirect(url_for("home"))
     typed = request.form.get("name", "")
-    if request.method == "POST":
-        name = annotations.clean_name(typed)
-        if name:
-            config.set_local("rater", name)
-            return redirect(url_for("home"))
-    return render_template(
-        "signin.html", typed=typed, rejected=request.method == "POST"
-    )
+    verdict = _name_verdict(local, typed) if request.method == "POST" else None
+    if verdict in ("free", "unchecked"):
+        config.set_local("rater", annotations.clean_name(typed))
+        return redirect(url_for("home"))
+    return render_template("signin.html", typed=typed, verdict=verdict)
+
+
+def _name_verdict(local: dict, typed: str) -> str:
+    """What to make of a rater's name: 'empty' (nothing usable in it), 'taken'
+    (already has ratings on the RDM for this participant), 'free', or
+    'unchecked' (the RDM could not be asked, so the name is let through)."""
+    name = annotations.clean_name(typed)
+    if not name:
+        return "empty"
+    try:
+        folder = share.root(local, config.load_study())
+        return "taken" if name in shared_ratings.taken_names(folder, local["subject"]) else "free"
+    except share.Unreachable:
+        return "unchecked"
+
+
+@app.route("/signin/check")
+def signin_check():
+    """For the sign-in page, as a name is typed: is it free?"""
+    local = config.load_local()
+    typed = request.args.get("name", "")
+    verdict = _name_verdict(local, typed) if _is_set_up(local) else "unchecked"
+    return jsonify(verdict=verdict, name=annotations.clean_name(typed))
 
 
 @app.route("/summary")
@@ -144,6 +275,9 @@ def generate_page():
         clip_limit=local.get("clip_limit"),
         clips=clips,
         spacing=clipset.spacing(clips) if clips else None,
+        # How the finished clips stand against the RDM: can they be uploaded?
+        standing=share.standing(share.root(local, study), subject,
+                                bool(local.get("clip_limit"))) if clips else None,
     )
 
 
@@ -251,6 +385,9 @@ def done_page():
     if annotations.next_position(ordered, labels) is not None:
         return redirect(url_for("annotate_page"))
     names = [label["name"] for label in study["labels"]]
+    # Every clip is labelled: the labels go to the RDM by themselves.
+    local = config.load_local()
+    uploaded = shared_ratings.upload(share.root(local, study), subject, rater)
     return render_template(
         "done.html",
         subject=subject,
@@ -258,6 +395,8 @@ def done_page():
         counts=annotations.counts(ordered, labels, names),
         file=annotations.path(subject, rater),
         last=len(ordered) - 1,
+        uploaded=uploaded,
+        rater=rater,
     )
 
 
@@ -315,4 +454,7 @@ def docs_page(slug: str):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000)
+    # `--dev`: restart on a change to the code, and reload the open page on a
+    # change to any of the app's files. For development only.
+    app.config["DEV"] = "--dev" in sys.argv
+    app.run(host="127.0.0.1", port=5000, debug=app.config["DEV"])

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Set up{% endblock %}
+{% block content %}
+<p class="eyebrow">Set up</p>
+<h1>Where is the study folder?</h1>
+<p class="lead">
+  The app needs the folder that holds the study's data. This is asked once on
+  this computer.
+</p>
+
+<section>
+  <h2>Before you start</h2>
+  <ol class="steps">
+    <li>If you are away from campus, connect to the university VPN.</li>
+    <li>Make sure the study's research data storage is open as a drive on this
+      computer. The study lead can give you its address and help you connect it.</li>
+    <li>In File Explorer, open the study folder on that drive, click the address
+      bar, copy the path, and paste it below. It looks like
+      <code>R:\study folder</code>.</li>
+  </ol>
+</section>
+
+<form class="signin" method="post" action="{{ url_for('setup_page') }}">
+  <label for="folder">Study folder</label>
+  <input id="folder" name="folder" type="text" value="{{ typed }}" required autofocus
+         autocomplete="off" spellcheck="false"
+         {% if problem in ('unreachable', 'empty') %}aria-invalid="true" aria-describedby="folder-error"{% endif %}>
+  {% if problem == 'unreachable' %}
+  <p class="field-error" id="folder-error">
+    That folder cannot be opened. Check the VPN, check that the drive is
+    connected, and check the path, then try again.
+  </p>
+  {% elif problem == 'empty' %}
+  <p class="field-error" id="folder-error">Please paste the path of the study folder.</p>
+  {% endif %}
+
+  {% if names %}
+  <label for="subject">Participant</label>
+  <p class="choice-note">
+    {% if kind == 'shared' %}Clips are ready for these participants. Which one will you label?
+    {% else %}No clips have been shared yet. Which participant will you generate clips for?{% endif %}
+  </p>
+  <select id="subject" name="subject" required>
+    <option value="" selected disabled>Choose a participant</option>
+    {% for name in names %}
+    <option value="{{ name }}">{{ name }}</option>
+    {% endfor %}
+  </select>
+  {% if problem == 'no_videos' %}
+  <p class="field-error">
+    That participant's videos are not directly in a <code>Video</code> folder, so
+    the app cannot read them yet. Please choose another.
+  </p>
+  {% endif %}
+  {% elif problem == 'nobody' %}
+  <p class="field-error">
+    No participant folders were found there. The study folder is the one that
+    holds folders named P01, P02 and so on.
+  </p>
+  {% endif %}
+
+  {# Checking the folder goes to the network drive and can take several
+     seconds, so the button says what is happening meanwhile (app.js). #}
+  <button class="button" type="submit"
+          data-busy="{% if names %}Setting up the participant…{% else %}Checking the study folder…{% endif %}">Continue</button>
+  <p class="busy-note" hidden>This can take up to a minute on a slow connection. Please wait.</p>
+</form>
+{% endblock %}

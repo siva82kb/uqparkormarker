@@ -6,6 +6,13 @@
 # The .vidt frame times are local wall-clock time. Brisbane is UTC+10 all year.
 utc_offset_hours = 10
 
+[share]
+# Clips and ratings are shared through this folder on the RDM, inside the
+# study folder. It has a name of its own because the way clips are cut will
+# change; a later effort uses a different name. Not part of the design that
+# clips are checked against.
+folder = "ICORR27 Annotate"
+
 [timing]
 # The recorder sometimes stamps frames late. A late stretch shows as a pause
 # in the timestamps followed by repeated timestamps. A window is sampled only

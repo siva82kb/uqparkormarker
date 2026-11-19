@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{# One page for both directions: getting the shared clips from the RDM
+   (kind = download) and putting this computer's clips there (kind = upload). #}
+{% set down = kind == 'download' %}
+{% block title %}{{ 'Getting the clips' if down else 'Uploading the clips' }} · {{ subject }}{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block content %}
+{% set failed = progress.state == 'failed' %}
+{% set finished = progress.state == 'done' %}
+<p class="eyebrow">
+  {% if down %}Getting the clips{% elif finished %}Clips shared{% else %}Uploading the clips{% endif %}
+</p>
+<h1>{{ subject }}</h1>
+<div class="hero-row">
+  <p class="lead">
+    {% if down %}
+    Clips for this participant are ready on the RDM. They are being copied to
+    this computer, so you can label them without waiting on the network.
+    {% elif finished %}
+    The clips are on the RDM. Other raters' apps will now fetch them by themselves.
+    {% else %}
+    The clips are being put on the RDM as one file, so that every rater labels
+    exactly the same clips.
+    {% endif %}
+  </p>
+  {% if finished and not down %}
+  <a class="button" href="{{ url_for('home') }}">Annotate clips</a>
+  {% endif %}
+</div>
+
+<section>
+  <div class="section-head">
+    <h2>Progress</h2>
+    <p class="progress-count"><span id="progress-count">{{ progress.done }} of {{ progress.total or '…' }}</span></p>
+  </div>
+  {# The page reloads once when the job ends: a download then moves on to the
+     annotator, and an upload shows that it is finished. #}
+  <div class="progress" id="progress" role="progressbar" aria-label="{{ 'Downloaded' if down else 'Uploaded' }}"
+       aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.done }}"
+       data-status-url="{{ status_url }}" {% if not finished and not failed %}data-reload-when-done{% endif %}>
+    <div class="progress-fill" id="progress-fill"
+         style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+  </div>
+  <div class="progress-below">
+    <div class="progress-text">
+      <p class="progress-message"><span class="pulse" id="progress-pulse" hidden></span><span
+         id="progress-message" aria-live="polite">{{ progress.message or 'Starting…' }}</span></p>
+      <p class="progress-error" id="progress-error" {% if not progress.error %}hidden{% endif %}>{{ progress.error }}</p>
+    </div>
+  </div>
+</section>
+
+{% if failed %}
+<section>
+  {% if progress.differences %}
+  <h2>What differs</h2>
+  <ul class="problems">
+    {% for difference in progress.differences %}<li>{{ difference }}</li>{% endfor %}
+  </ul>
+  <p class="note">
+    The shared clips were made with settings that differ from this copy of the
+    app, so they cannot be used here. This copy of the app is probably out of
+    date: get the current version, then start it again.
+  </p>
+  {% else %}
+  <h2>What to do</h2>
+  <p class="note">Nothing was changed. When the problem above is sorted out, try again.</p>
+  <form method="post" action="{{ url_for('fetch_page' if down else 'upload_page') }}">
+    <button class="button" type="submit">Try again</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if not down %}
+<p class="actions"><a class="link" href="{{ url_for('generate_page') }}">Back to the clips</a></p>
+{% endif %}
+{% endblock %}

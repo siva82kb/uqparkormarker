@@ -22,55 +22,131 @@ applies to the ICORR work.
 - **Raters are investigators on the study.** Most are clinicians, so the
   app must do the work: nothing is to be done by hand.
 
-### Sharing the clips through the RDM
+### The shared folder on the RDM
 
 Clips are generated once, by one person, and every rater labels the same
-files.
+files. Clips and ratings are shared through one folder on the RDM, inside
+the study folder:
 
-- The clips for this work are kept on the RDM in a folder with a name of
-  its own, `icorr_annotate`, inside the study folder, with one folder per
-  participant: `<source>/icorr_annotate/<Pxx>/`.
-- A unique folder name is used because the procedure for cutting clips
+```
+<source>/ICORR27 Annotate/
+    clips/
+        <Pxx>/
+            <Pxx>_clips.zip        everything a rater needs, in one file
+            <Pxx>_clips_id.txt     a short code that identifies the set
+    ratings/
+        <Pxx>_<rater>_annotations_<YYYYMMDD-HHMMSS>.csv
+```
+
+- The folder has a name of its own because the procedure for cutting clips
   will change. Clips made by a later procedure go in a folder with a
-  different name, so the two are never mixed.
-- The participant's folder is put there by hand, once, by the person who
-  generated the clips. The app has no button for sharing.
+  different name, so the two are never mixed. The name is the setting
+  `folder` under `[share]` in `study.toml`. That setting is not part of the
+  design that clips are checked against, so changing it does not make
+  existing clips count as mismatched.
+- **The zip** holds the clips, `segments.csv`, `design.toml` and the saved
+  reading of the videos (`recording.json.gz`). No label file ever goes in
+  it. It is written under a temporary name and renamed when complete, on
+  upload and on download, so a half-copied zip is never taken for a whole
+  one.
+- **The set code** is made from `segments.csv` and `design.toml`. It lets
+  the app tell, without downloading the zip, whether the clips on a
+  computer are the shared ones.
 
 ### What the app does on start
 
 It checks in this order:
 
-1. **Are the clips on this computer?** Go to the annotator: the rater's
+1. **No setup yet?** Ask where the study folder is (below).
+2. **Are the clips on this computer?** Go to the annotator: the rater's
    name, then labelling.
-2. **If not, are they in `icorr_annotate` on the RDM?** Download them, then
-   go to the annotator.
-3. **If neither**, carry on with the usual flow: read the videos, show the
+3. **If not, is there a zip for the participant on the RDM?** Download and
+   unpack it, with a progress bar, then go to the annotator.
+4. **If neither**, carry on with the usual flow: read the videos, show the
    data summary, and generate the clips.
 
-### Proposed details, to be confirmed when this is built
+If the study folder cannot be reached (VPN off, drive not mapped), the app
+says so and asks the person to connect and reload. It never guesses.
 
-1. The folder name `icorr_annotate` is a setting in `study.toml`, so every
-   rater's app looks in the same place and a later effort can change it in
-   one line.
-2. Only the clips, `segments.csv` and `design.toml` are downloaded. Label
-   files that happen to be in the shared folder are never fetched.
-3. An interrupted upload or download is noticed, and only the missing
-   clips are fetched, as with interrupted cutting.
-4. The settings in the shared folder must equal the rater's `study.toml`.
-   If they differ, the app says so and does not download.
-5. Files are copied many at a time, with the progress bar, because one at a
-   time over the VPN would take 10 to 15 minutes for 500 clips.
-6. The app asks "where is the study folder?" on first start, in place of
-   typing it into `local.toml`. With one participant in `icorr_annotate`,
-   the app picks the participant by itself.
+### First-time setup
+
+One page, in place of typing into `local.toml`:
+
+- It asks for the study folder (the RDM drive, or a copy) and checks that it
+  exists. It gives short instructions for connecting; these do not contain
+  the RDM address, which is never written in a committed file.
+- **Participant.** If the shared folder holds clips for exactly one
+  participant, the app takes that one. If it holds several, the person
+  picks from them. If it holds none, the person picks from the participant
+  folders found in the study folder (this is the person who will generate).
+
+### Uploading clips
+
+- When clips have been generated on a computer and the RDM has no zip for
+  that participant, the generate page shows an **"Upload to RDM"** button.
+- Pressing it packs the zip straight onto the RDM, with a progress bar.
+- If a zip for the participant already exists, local clips are never
+  uploaded: the button is not shown, and the upload checks once more just
+  before writing.
+- The button is not offered while the `clip_limit` test setting is on,
+  since that would share only part of a set.
+
+### Downloading clips
+
+- The settings inside the zip must equal the rater's `study.toml` (apart
+  from `[share]`). This is checked before the download. If they differ,
+  the app says what differs and does not download.
+- After unpacking, the saved reading of the videos is pointed at the
+  rater's own study folder, so the data summary opens without reading the
+  videos again, whatever drive letter the rater uses.
+
+### Rater names
+
+- **While typing**, the sign-in page says under the box whether the name is
+  free. A name is taken if `ratings/` already has a file from it for this
+  participant. While it is taken, the Start button is off. There is no
+  pop-up. If the RDM cannot be reached, the page says the name could not be
+  checked and lets the rater go on.
+- **At the first upload** of ratings from a computer, the name is checked
+  again. If it clashes, the app adds a random three-digit number (`ann`
+  becomes `ann_417`) and tells the rater the name their ratings were
+  uploaded under.
+- The name used for uploads is remembered in `local.toml` as `uploaded_as`.
+  Later uploads from the same computer use it without checking and count as
+  the same rater. So **a rater must stay on one computer.**
+
+### Uploading ratings
+
+- When a rater has labelled every clip, the app copies their label file to
+  `ratings/` by itself. Nothing is pressed.
+- The copy is named as on the rater's computer, with the upload name and
+  the date and time added: `<Pxx>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv`.
+  Inside the copy, the `rater` column carries the upload name, so the file
+  name and its rows agree. The file on the rater's computer is not changed.
+- An upload never replaces an earlier one. **The most recent file for a
+  rater is the one that counts.** When an earlier one exists, the page says
+  so, with its date, and that the new one is now the most recent.
+- If nothing has changed since the last upload, nothing is uploaded again.
+- If a rater changes a label after finishing, the next visit to the
+  finished page uploads a new file.
+- **Ratings are held back**, and the page says why, in two cases: the RDM
+  has no zip for the participant yet (the clips must be shared first), or
+  the clips on this computer are not the shared set (the person should run
+  a reset and get the shared clips).
+
+### When the RDM cannot be reached
+
+The same rule everywhere (downloading clips, uploading clips, uploading
+ratings, checking a name): the app says so in plain words, changes nothing,
+and tries again the next time the page is opened. Ratings that could not be
+uploaded stay safe on the rater's computer.
 
 ### Left out on purpose
 
-- A button to share clips to the RDM.
-- Sending label files back to the RDM. Each rater's labels stay on their
-  own computer and are passed on some other way.
 - Any rule that a new set of clips must avoid footage used by an earlier
   set. The unique folder name keeps sets apart instead.
+- A marker to stop two raters starting with the same name at the same
+  moment. The three-digit number at upload covers it.
 
 ### Not settled
 
@@ -79,7 +155,6 @@ It checks in this order:
   investigators on the study. It must be settled before anyone else rates.
 - The late timestamps, and lining clips up with the sensor data, are
   parked (see `CLAUDE.md`).
-
 ## 1. User flow
 
 ### One-time setup
@@ -96,9 +171,10 @@ The order of the whole flow is fixed:
 
 The rater's name is never asked before the clips are ready.
 
-Not built yet: steps 1 to 3 of the table below. Until they exist, the data
-source, folder and subject are typed into `local.toml` by hand, and the app
-shows a "Setup needed" page if the file is missing.
+For the ICORR work the setup is one page that asks for the study folder and
+settles the participant (see "First-time setup" in the ICORR section). The
+fuller sequence in the table below is the original design and has not been
+built; it will be revisited with the rest of the sharing design.
 
 | Step | Screen | What happens |
 |---|---|---|
@@ -255,7 +331,7 @@ groups, the order, the addresses (`/docs/<slug>`) and "previous" and "next".
 
 | Group | Page | Address | Needs the videos read |
 |---|---|---|---|
-| How the app works | From videos to clips | `/docs/clips` | No |
+| How the app works | From videos to clips (starts with the folder layout: source, output and shared folders, and names the file each step reads and writes) | `/docs/clips` | No |
 | The timestamp problem | Some timestamps are late | `/docs/timing-problem` | No |
 | | What this participant's timestamps show | `/docs/timing-evidence` | Yes |
 | | The rule the app uses | `/docs/timing-rule` | Yes |
@@ -432,6 +508,9 @@ parkour/
     dataset.py      find subjects and videos; frame times per video; the only module that knows the folder layout
     loader.py       read a subject's videos once, in the background, with progress; reuse the saved result
     recording_store.py  save what was read from a subject's videos, and load it on later starts
+    share.py        the shared folder on the RDM: clips as one zip, up and down, and the set id
+    shared_ratings.py  ratings in the shared folder: names in use, uploading with date and time
+    transfer.py     run an upload or download in the background, with progress
     timing.py       which windows have trustworthy timestamps
     lag.py          measure how late each timestamp is (for the docs pages only)
     timing_report.py  numbers and series for the docs pages on timestamps, from a subject's videos
@@ -443,10 +522,11 @@ parkour/
     clipset.py      a subject's clip folder: segments.csv, design.toml, which clips exist
     extract.py      cut clips with ffmpeg in a background thread; progress tracking
     fmt.py          format values for display
+    devreload.py    developer mode (`app.py --dev`): tell the open page when the app's files change
     annotations.py  a rater's clip order; read and append the annotation CSV
     reset.py        what a reset removes, keeps and sets aside
-templates/          base, setup_pending, signin, loading, summary, generate, mismatch, annotate, done,
-                    annotation_summary (the other setup pages are not written yet)
+templates/          base, setup, unreachable, transfer, signin, loading, summary, generate, mismatch,
+                    annotate, done, annotation_summary
 templates/docs/     the docs pages: shared frame, contents, figures, one file per page
 static/             style.css, app.js, fonts/
 data4annotation/    clips and annotations (ignored by git); _archive/ holds labels set aside by a reset
@@ -460,6 +540,11 @@ Third-party packages: Flask and imageio-ffmpeg. Everything else is the
 standard library.
 
 ## 8. Look and feel
+
+A button whose form makes the app wait on the network drive (the Continue
+button on the set-up page) carries `data-busy`. Once pressed it shows a
+spinner and says what is happening, and cannot be pressed twice, until the
+next page arrives.
 
 White page, hairline rules, compact spacing. Colours come from the UQ brand
 palette: purple (`#51247A`) for the title bar, titles and task video, and the
@@ -496,7 +581,11 @@ packages the raters will get. `uv.lock` is committed.
    checked on one participant). Annotation summary page (done).
 5. `annotations.py`, sign-in, annotate and done pages (done; checked on 25
    clips of one participant, including the Shift rule in a browser)
-6. Remaining setup pages (data source, folder, subject), styling pass
+5a. ICORR sharing: share.py, shared_ratings.py, 	ransfer.py; the setup,
+   download, upload and "not reachable" pages; the name check at sign-in;
+   ratings uploaded from the finished page (done; checked against a folder
+   standing in for the RDM, not yet against the RDM itself)
+6. Styling pass
 7. End-to-end run on the sample subject; `run.bat` (not written yet);
    rater instructions
 8. First-run test from a fresh copy of the repo with no `.venv/` or

@@ -105,7 +105,7 @@ document.querySelectorAll(".readout").forEach((readout) => {
     bar.setAttribute("aria-valuenow", p.done);
     set("progress-fill", (e) => (e.style.width = `${share}%`));
     set("progress-count", (e) => (e.textContent = p.total
-      ? `${p.done} of ${p.total} · ${Math.floor(share)}%`
+      ? `${p.done} of ${p.total}${p.unit ? " " + p.unit : ""} · ${Math.floor(share)}%`
       : "Preparing"));
     set("clip-total", (e) => p.total && (e.textContent = p.total));
     drawMix(p);
@@ -167,6 +167,47 @@ document.querySelectorAll(".readout").forEach((readout) => {
   poll();
 })();
 
+// Sign-in: as a name is typed, ask the app whether it is free, and say so in
+// the line under the box. While the name is taken or unusable, Start is off.
+// (The app checks again when the form is sent, so this is a convenience.)
+(function () {
+  const form = document.getElementById("signin");
+  if (!form) return;
+  const box = document.getElementById("name");
+  const line = document.getElementById("name-verdict");
+  const start = document.getElementById("signin-start");
+  let waiting = null, asked = 0;
+
+  const show = (verdict) => {
+    const bad = verdict === "taken" || verdict === "empty";
+    line.textContent = verdict ? line.dataset[verdict] : "";
+    line.classList.toggle("field-error", bad);
+    box.setAttribute("aria-invalid", bad);
+    start.disabled = bad;
+  };
+
+  const check = async () => {
+    const mine = ++asked;                 // ignore answers to earlier typing
+    if (!box.value.trim()) return show(null);
+    try {
+      const url = `${form.dataset.checkUrl}?name=${encodeURIComponent(box.value)}`;
+      const answer = await (await fetch(url, { cache: "no-store" })).json();
+      if (mine === asked) show(answer.verdict);
+    } catch {
+      if (mine === asked) show("unchecked");
+    }
+  };
+
+  box.addEventListener("input", () => {
+    start.disabled = true;                // until this name has been checked
+    line.textContent = "Checking…";
+    line.classList.remove("field-error");
+    clearTimeout(waiting);
+    waiting = setTimeout(check, 400);     // wait for a pause in the typing
+  });
+  if (box.value.trim()) check();
+})();
+
 // Annotation: a label is saved only while Shift is held down, whether it is
 // given with a number key or with a click. A key or a click without Shift
 // does nothing but say why, so a slip of the hand never becomes a label.
@@ -222,4 +263,43 @@ document.querySelectorAll(".readout").forEach((readout) => {
       else refuse();
     })
   );
+})();
+
+// Slow forms: a submit button with data-busy shows a spinner and that text
+// once its form is sent, and cannot be pressed twice, until the next page
+// arrives. A .busy-note in the same form is shown as well.
+document.querySelectorAll("button[data-busy]").forEach((button) => {
+  const form = button.form;
+  if (!form) return;
+  const idle = button.textContent;
+  const note = form.querySelector(".busy-note");
+  const set = (busy) => {
+    button.classList.toggle("busy", busy);
+    button.textContent = busy ? button.dataset.busy : idle;
+    button.setAttribute("aria-busy", busy);
+    if (note) note.hidden = !busy;
+    // Disable after the form has gone, or the browser would not send it.
+    setTimeout(() => (button.disabled = busy), 0);
+  };
+  form.addEventListener("submit", () => set(true));
+  // Coming back with the Back button shows the page as it was left.
+  window.addEventListener("pageshow", (e) => e.persisted && set(false));
+});
+
+// Developer mode (app started with --dev): reload this page when any of the
+// app's files change. The server restarts on a change to the code, so a
+// failed request just means "ask again in a moment".
+(function () {
+  const url = document.body.dataset.devStampUrl;
+  if (!url) return;
+  let seen = null;
+  const ask = async () => {
+    try {
+      const { stamp } = await (await fetch(url, { cache: "no-store" })).json();
+      if (seen !== null && stamp !== seen) return location.reload();
+      seen = stamp;
+    } catch { /* the server is restarting */ }
+    setTimeout(ask, 1000);
+  };
+  ask();
 })();

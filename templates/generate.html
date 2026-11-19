@@ -12,9 +12,37 @@
     videos and each one is cut into a short clip for annotation.
   </p>
   {% if finished %}
-  <a class="button" href="{{ url_for('home') }}">Annotate clips</a>
+  <div class="hero-buttons">
+    {% if standing == 'upload' %}
+    <form method="post" action="{{ url_for('upload_page') }}">
+      <button class="button button-quiet" type="submit">Upload to RDM</button>
+    </form>
+    {% endif %}
+    <a class="button" href="{{ url_for('home') }}">Annotate clips</a>
+  </div>
   {% endif %}
 </div>
+{% if finished %}
+{# How these clips stand against the shared folder on the RDM. #}
+<p class="sharing-note">
+  {% if standing == 'upload' %}
+  These clips are only on this computer. "Upload to RDM" shares them, so that
+  every rater labels the same clips.
+  {% elif standing == 'shared' %}
+  These clips are the ones shared on the RDM.
+  {% elif standing == 'other' %}
+  <strong>These are not the clips shared on the RDM.</strong> The RDM has a
+  different set for this participant. Labels made here will not be uploaded.
+  To label the shared clips, stop the app and run <code>uv run python reset.py</code>.
+  {% elif standing == 'limited' %}
+  These clips cannot be uploaded while the <code>clip_limit</code> test setting
+  is on, because that would share only part of a set.
+  {% else %}
+  The RDM cannot be reached just now, so the app cannot tell whether these clips
+  are shared. Connect and reload this page.
+  {% endif %}
+</p>
+{% endif %}
 
 <section class="figures">
   <div class="figure">

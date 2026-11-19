@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from . import clipset, config, recording_store
+from . import clipset, config, recording_store, shared_ratings
 
 ARCHIVE_DIR = "_archive"
 ANNOTATIONS = "*_annotations.csv"
@@ -67,7 +67,8 @@ def plan(subject: str, recording: bool = False, rater: bool = False,
     if clips.is_dir():
         found.n_clips = sum(1 for _ in clips.glob("*.mp4"))
     names = [clipset.CLIP_DIR, clipset.SEGMENTS_FILE, clipset.DESIGN_FILE,
-             clipset.SPENT_FILE]        # the time spent goes with the clips
+             clipset.SPENT_FILE,        # the time spent goes with the clips
+             shared_ratings.NOTE_FILE]  # ... and so does the note of what was uploaded
     if recording:
         names.append(recording_store.FILE)
     found.delete = [folder / name for name in names if (folder / name).exists()]
@@ -90,3 +91,4 @@ def apply(found: Plan) -> None:
             path.unlink()
     if found.forget_rater:
         config.remove_local("rater")
+        config.remove_local("uploaded_as")      # the upload name belongs to that rater

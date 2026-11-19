@@ -16,13 +16,82 @@ raters label.
   </ul>
 </section>
 
+<section>
+  <h2>Where the files are</h2>
+  <div class="prose">
+    <p>
+      The app works with three folders. It only <strong>reads</strong> the
+      recordings in the first. It <strong>makes</strong> everything in the
+      second. It <strong>shares</strong> finished work through the third.
+      <code>Pxx</code> stands for the participant's folder name.
+    </p>
+  </div>
+
+  <p class="tree-title"><strong>1. The source folder</strong>: the recordings, on the study's storage drive. Never changed by the app.</p>
+  <pre class="code tree">&lt;source&gt;/Pxx/Video/
+    experiment_details.json            which task each video shows
+    task_001_1669336000000000.avi      a task video: the pictures
+    task_001_1669336000000000.vidt     its timestamps, one per frame
+    unlabelled_x_1669336050000000.avi  an unlabelled video (between two tasks)
+    unlabelled_x_1669336050000000.vidt its timestamps
+    ...                                about 180 to 200 pairs like these</pre>
+  <div class="prose">
+    <p>
+      Every video is a pair of files with the same name. The
+      <code>.avi</code> file holds the pictures. The <code>.vidt</code> file
+      holds one timestamp for each frame of that video. The long number in
+      the name is the time the video started.
+    </p>
+  </div>
+
+  <p class="tree-title"><strong>2. The output folder</strong>: everything the app makes, on this computer, inside the app's own folder.</p>
+  <pre class="code tree">data4annotation/Pxx/
+    recording.json.gz                  step 1: what was read from the source folder
+    segments.csv                       step 3: the list of picked clips
+    design.toml                        step 3: a copy of study.toml as it was then
+    clips/seg_0001.mp4 ...             step 4: the clips, one file each
+    generation_time.json               step 4: how long the cutting has taken
+    Pxx_&lt;rater&gt;_annotations.csv        the labels, one file per rater</pre>
+  <p class="tree-title"><strong>3. The shared folder</strong>: on the study's storage drive, for passing clips and labels between raters. Its name ({{ study.share.folder }}) is set in <code>study.toml</code>.</p>
+  <pre class="code tree">&lt;study folder&gt;/{{ study.share.folder }}/
+    clips/Pxx/Pxx_clips.zip            the clips, zipped, for other raters
+    clips/Pxx/Pxx_clips_id.txt         which set of clips the zip holds
+    ratings/Pxx_&lt;rater&gt;_annotations_&lt;date&gt;-&lt;time&gt;.csv
+                                       a rater's labels, once all clips are labelled</pre>
+  <div class="prose">
+    <p>
+      The zip holds the clips, <code>segments.csv</code>,
+      <code>design.toml</code> and <code>recording.json.gz</code>. It never
+      holds a label file. A rater who downloads it does not need the source
+      folder.
+    </p>
+    <p>
+      The settings are in two files beside the app:
+      <code>study.toml</code> (the study design, the same for every rater)
+      and <code>local.toml</code> (this computer: where the source folder is,
+      which participant, and the rater's name).
+    </p>
+  </div>
+</section>
+
 <section class="prose">
   <h2>Four steps</h2>
   <ol>
-    <li><strong>Read.</strong> The app reads every video's timestamps for the chosen participant.</li>
-    <li><strong>Remove.</strong> It works out every clip that could be cut from every video, and removes the ones whose timestamps cannot be trusted. <a class="link" href="{{ url_for('docs_page', slug='timing-rule') }}">The rule</a> has its own page.</li>
-    <li><strong>Pick.</strong> From the clips that are left, it picks {{ n_clips }} at random, with no two sharing a frame{% if n_task_clips is not none %}: {{ n_task_clips }} from task video and {{ n_unlabelled_clips }} from unlabelled video{% endif %}.</li>
-    <li><strong>Cut.</strong> It cuts each picked clip out of its video and saves it as a small MP4 file, with a row in <code>segments.csv</code> saying exactly where it came from.</li>
+    <li>
+      <strong>Read.</strong> For each video of the participant, the app reads
+      three things from the source folder:
+      <ul>
+        <li>the timestamp of every frame, from the video's <code>.vidt</code> file;</li>
+        <li>the number of frames and the frame rate, from the first part of its <code>.avi</code> file (the pictures are not read);</li>
+        <li>the task it shows, from <code>experiment_details.json</code>.</li>
+      </ul>
+      It saves all of this in <code>recording.json.gz</code>, so the source
+      folder is read only once.
+    </li>
+    <li><strong>Remove.</strong> Using those timestamps, it works out every clip that could be cut from every video, and removes the ones whose timestamps cannot be trusted. <a class="link" href="{{ url_for('docs_page', slug='timing-rule') }}">The rule</a> has its own page. Nothing is written in this step.</li>
+    <li><strong>Pick.</strong> From the clips that are left, it picks {{ n_clips }} at random, with no two sharing a frame{% if n_task_clips is not none %}: {{ n_task_clips }} from task video and {{ n_unlabelled_clips }} from unlabelled video{% endif %}.
+        The list is written to <code>segments.csv</code>, one row per clip, saying exactly which video and which frames. A copy of <code>study.toml</code> is saved beside it as <code>design.toml</code>.</li>
+    <li><strong>Cut.</strong> For each row of <code>segments.csv</code>, it opens that video's <code>.avi</code> file in the source folder, cuts out the frames, and saves them as a small MP4 file in <code>clips/</code>, named after the row (<code>seg_0001.mp4</code>, <code>seg_0002.mp4</code>, ...).</li>
   </ol>
   <p>A clip never crosses from one video into the next.</p>
   <p class="note">The number of clips ({{ n_clips }}), the length of a clip ({{ clip_seconds }} s) and the other design choices are read from <code>study.toml</code>. This page shows the values now in that file.</p>

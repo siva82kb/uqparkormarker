@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Study folder not reachable{% endblock %}
+{% block content %}
+<p class="eyebrow">Not connected</p>
+<h1>The study folder cannot be reached</h1>
+<p class="lead">
+  The app could not open the study folder, so it cannot tell whether clips are
+  ready for you. Nothing has been changed.
+</p>
+
+<section>
+  <h2>What to do</h2>
+  <ol class="steps">
+    <li>If you are away from campus, connect to the university VPN.</li>
+    <li>Check that the study's research data storage is connected as a drive.</li>
+    <li>Then reload this page.</li>
+  </ol>
+  <pre class="code">{{ folder }}</pre>
+</section>
+
+<p class="actions"><a class="button" href="{{ url_for('home') }}">Try again</a></p>
+{% endblock %}

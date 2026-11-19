@@ -20,6 +20,25 @@ See `README.md` for usage and `PLAN.md` for the design and open decisions.
 - The website is beautiful, minimal, professional and clean: plain HTML, one 
   stylesheet, one script, no front-end framework.
 
+## Sharing through the RDM (temporary, for ICORR)
+
+The design is in `PLAN.md` under "ICORR (temporary)". Points that are easy to
+get wrong:
+
+- The share folder name is `[share] folder` in `study.toml`. It is left out
+  of the design check (`clipset.NOT_DESIGN`), so changing it never makes
+  clips count as mismatched.
+- Two different codes: `clipset.set_id` is the same wherever the same clips
+  are, and is what tells shared clips from other clips. `clipset.set_code`
+  changes on every generation and only keeps browsers from showing old clips.
+- A missing file on a drive that is out of reach looks like a file that is
+  not there. Always check the study folder first (`share.need_study_folder`)
+  and treat failure as "not reachable": say so, change nothing, try later.
+- The rater a set of ratings belongs to is decided by `uploaded_as` in
+  `local.toml`, so a rater is tied to one computer. That is intended.
+- Label files never go in the clips zip, and uploaded ratings are never
+  replaced or deleted.
+
 ## Lessons from bugs
 
 - **Never let a browser keep a clip.** On 2026-11-19 clips were served with
@@ -124,6 +143,8 @@ the sync to the sensors remain to be done.
 - Run everything through `uv` (`uv run python ...`), never Anaconda, so
   development matches what raters get. Python 3.12, pinned in `pyproject.toml`.
 - Tests: `uv run python -m unittest discover -s tests -t .`
+- `uv run python app.py --dev` reloads the open page when any app file is
+  saved (`parkour/devreload.py`). Development only; raters run without it.
 - Source videos are on the RDM, mapped as a drive on this machine. The folder
   and subject in use are in `local.toml` (not committed).
 - The RDM is slow over the VPN: one to two seconds to open any file. Do not

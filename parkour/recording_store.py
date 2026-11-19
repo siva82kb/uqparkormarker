@@ -86,6 +86,32 @@ def load(subject_dir: Path) -> Recording | None:
         return None
 
 
+def adopt(subject_dir: Path) -> bool:
+    """Point a saved recording that was made on another computer at this
+    computer's study folder, so it can be used here.
+
+    The file records the folder the videos were read from, and `load`
+    ignores a file read from a different folder. A recording that came with
+    shared clips was read through someone else's drive, perhaps under a
+    different drive letter; the videos are the same. True if a usable file
+    is in place afterwards.
+    """
+    file = path(subject_dir)
+    try:
+        with gzip.open(file, "rt", encoding="utf-8") as fh:
+            content = json.load(fh)
+        if content["version"] != VERSION:
+            return False
+        content["source"] = str(Path(subject_dir))
+        partial = file.with_name(file.name + ".part")
+        with gzip.open(partial, "wt", encoding="utf-8") as fh:
+            json.dump(content, fh, separators=(",", ":"))
+        os.replace(partial, file)
+        return True
+    except (OSError, EOFError, ValueError, KeyError, TypeError):
+        return False
+
+
 def forget(subject_dir: Path) -> None:
     """Remove the saved recording, so the videos are read again."""
     path(subject_dir).unlink(missing_ok=True)
