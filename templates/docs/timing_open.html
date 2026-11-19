@@ -16,8 +16,8 @@ still unanswered.
     exactly, and they slowly move apart.
   </p>
   <div class="example">
-    <p><strong>Example.</strong> Two wristwatches. One is 2.0 s ahead of the other in the morning and 2.3 s ahead by the evening.</p>
-    <p>The 2.0 s is the <strong>offset</strong>. The extra 0.3 s over the day is the <strong>drift</strong>. Knowing both, a time on one watch can be turned into a time on the other.</p>
+    <p><strong>Example.</strong> The video computer's clock is 2.0 s ahead of a sensor's clock at the start of a session, and 2.3 s ahead at the end.</p>
+    <p>The 2.0 s is the <strong>offset</strong>. The extra 0.3 s over the session is the <strong>drift</strong>. Knowing both, a time on one clock can be turned into a time on the other.</p>
   </div>
 </section>
 
@@ -66,6 +66,13 @@ still unanswered.
 <section>
   <h2>Questions still open</h2>
   <ul class="problems">
+    <li>
+      <strong>What should happen to clips with missing frames?</strong>
+      A few allowed clips cover more than {{ clip_seconds }} s of real time, because
+      frames are missing inside them. The rule does not remove them. They
+      could be removed, by also limiting the time from a clip's first
+      timestamp to its last. This has not been decided.
+    </li>
     <li>
       <strong>Do the sensors share the video computer's clock?</strong>
       If they do, the jumps are only a check. If they do not, the jumps are

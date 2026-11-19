@@ -208,61 +208,118 @@ document.querySelectorAll(".readout").forEach((readout) => {
   if (box.value.trim()) check();
 })();
 
-// Annotation: a label is saved only while Shift is held down, whether it is
-// given with a number key or with a click. A key or a click without Shift
-// does nothing but say why, so a slip of the hand never becomes a label.
-// Backspace (no Shift needed) shows the clip before this one.
+// Annotation: each clip gets a label for each arm. A key chooses an arm (the
+// keys are listed on each arm, in data-keys: A or R for right, F or L for
+// left); only then do that arm's labels work, by pressing 1 to 5 or by
+// clicking. The other arm's labels, and both arms' before a choice is made,
+// are off, so a stray click or number never becomes a label.
+// Choosing a label saves nothing: the clip stays on screen showing both
+// choices, and a wrong press can be put right. Moving on is the deliberate
+// step that saves: the Next button or the right arrow sends both labels
+// together, and only when both arms have one. The left arrow goes back one
+// clip; choices not yet saved with Next are dropped.
 (function () {
-  const form = document.getElementById("annotate");
-  if (!form) return;
+  const page = document.getElementById("annotate");
+  if (!page) return;
+  const form = document.getElementById("annotate-form");
   const hint = document.getElementById("annotate-hint");
-  const buttons = [...form.querySelectorAll(".label")];
-  const keys = new Set(buttons.map((button) => button.dataset.key));
+  const next = document.getElementById("annotate-next");
+  const arms = [...page.querySelectorAll(".arm")];
+  const byName = new Map(arms.map((arm) => [arm.dataset.arm, arm]));
+  // Which arm each key chooses, e.g. a -> right, r -> right, f -> left, l -> left.
+  const armOfKey = new Map(arms.flatMap((arm) =>
+    arm.dataset.keys.split(" ").map((key) => [key, arm.dataset.arm])));
+  const picked = (arm) => arm.querySelector(".label-chosen")?.dataset.key ?? "";
+  const saved = new Map(arms.map((arm) => [arm.dataset.arm, picked(arm)]));   // as the page arrived
+  let chosen = null;                  // the arm that number keys go to
   let sent = false;
 
-  const arm = (on) => {               // show whether Shift is down
-    document.body.classList.toggle("armed", on);
-    hint.classList.remove("refused");
-    hint.textContent = on ? hint.dataset.armed : hint.dataset.idle;
+  const done = () => arms.every(picked);
+  const changed = () => arms.some((arm) => picked(arm) !== saved.get(arm.dataset.arm));
+  const say = (what, warn = false) => {
+    hint.textContent = hint.dataset[what];
+    hint.classList.toggle("refused", warn);
+  };
+  const rest = () => say(!done() ? chosen || "idle" : changed() ? "done" : "saved");
+
+  const choose = (name) => {
+    chosen = name;
+    arms.forEach((arm) => {
+      const on = arm.dataset.arm === name;
+      arm.classList.toggle("arm-active", on);
+      arm.querySelectorAll(".label").forEach((button) => (button.disabled = !on));
+    });
+    rest();
   };
 
-  const refuse = () => {
-    hint.classList.add("refused");
-    hint.textContent = hint.dataset.refused;
+  const pick = (name, key) => {       // mark this arm's label; nothing is saved yet
+    byName.get(name).querySelectorAll(".label").forEach((button) =>
+      button.classList.toggle("label-chosen", button.dataset.key === key));
+    next.classList.toggle("button-off", !done());
+    rest();
   };
 
-  const save = (key) => {
-    if (sent) return;                 // one label per showing of a clip
+  const moveOn = () => {
+    if (!done()) return say("notDone", true);
+    if (sent) return;
     sent = true;
-    document.getElementById("annotate-key").value = key;
+    say("moving");                    // answer the press at once, before the next page arrives
+    next.classList.add("button-busy");
+    if (!changed()) return (location.href = page.dataset.next);    // nothing new to save
+    arms.forEach((arm) => (form.elements[arm.dataset.arm].value = picked(arm)));
     form.submit();
   };
 
+  arms.forEach((arm) => {
+    // A click on a label counts only for the arm chosen with its key. A click
+    // on an arm that is off (its buttons are disabled) just says what to do.
+    arm.querySelectorAll(".label").forEach((button) =>
+      button.addEventListener("click", () => {
+        if (chosen === arm.dataset.arm) pick(chosen, button.dataset.key);
+      }));
+    arm.addEventListener("pointerdown", () => {
+      if (chosen !== arm.dataset.arm) say("noArm", true);
+    });
+  });
+  next.addEventListener("click", (event) => { event.preventDefault(); moveOn(); });
+
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Shift") return arm(true);
     if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
-    // event.code names the physical key, so Shift+1 is "Digit1", not "!".
-    const digit = /^Digit(\d)$/.exec(event.code);
-    if (digit && keys.has(digit[1])) {
+    const key = event.key.toLowerCase();
+    if (armOfKey.has(key)) {
+      choose(armOfKey.get(key));
+    } else if (/^[0-9]$/.test(key)) {
+      const arm = chosen && byName.get(chosen);
+      if (!arm) return say("noArm", true);
+      if (arm.querySelector(`.label[data-key="${key}"]`)) pick(chosen, key);
+    } else if (key === "arrowright") {
       event.preventDefault();
-      if (event.shiftKey) save(digit[1]);
-      else refuse();
-    } else if (event.key === "Backspace" && form.dataset.previous) {
+      moveOn();
+    } else if (key === "arrowleft" && page.dataset.previous) {
       event.preventDefault();
-      location.href = form.dataset.previous;
+      location.href = page.dataset.previous;
     }
   });
-  document.addEventListener("keyup", (event) => {
-    if (event.key === "Shift") arm(false);
-  });
-  window.addEventListener("blur", () => arm(false));   // Shift released elsewhere
 
-  buttons.forEach((button) =>
-    button.addEventListener("click", (event) => {
-      if (event.shiftKey) save(button.dataset.key);
-      else refuse();
-    })
-  );
+  rest();
+})();
+
+// Finished page: the labels are uploaded to the RDM in the background, so the
+// page shows at once. Ask for the outcome until it is in, then show it in
+// place of the "uploading" note.
+(function () {
+  const box = document.getElementById("upload-outcome");
+  if (!box) return;
+  const ask = async () => {
+    try {
+      const answer = await fetch(box.dataset.outcomeUrl, { cache: "no-store" });
+      if (answer.status === 200) return (box.innerHTML = await answer.text());
+    } catch {
+      // The app did not answer: keep the note and ask again.
+    }
+    setTimeout(ask, 800);
+  };
+  ask();
 })();
 
 // Slow forms: a submit button with data-busy shows a spinner and that text

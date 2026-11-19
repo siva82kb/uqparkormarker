@@ -25,7 +25,7 @@ from pathlib import Path
 from . import clipset, config, recording_store, shared_ratings
 
 ARCHIVE_DIR = "_archive"
-ANNOTATIONS = "*_annotations.csv"
+ANNOTATIONS = "*_annotations*.csv"     # the work-in-progress file and every dated one
 
 
 @dataclass
@@ -57,19 +57,22 @@ class Plan:
 
 
 def plan(subject: str, recording: bool = False, rater: bool = False,
-         now: datetime | None = None) -> Plan:
-    """Work out what a reset of `subject` would do."""
+         now: datetime | None = None, ratings_only: bool = False) -> Plan:
+    """Work out what a reset of `subject` would do. With `ratings_only`, the
+    clips are left alone: only the label files are moved to the archive, so
+    the same clips can be labelled again from the start."""
     folder = clipset.folder(subject)
     stamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
     found = Plan(subject, archive_to=config.CLIPS_ROOT / ARCHIVE_DIR / f"{subject}_{stamp}")
 
     clips = folder / clipset.CLIP_DIR
-    if clips.is_dir():
+    if clips.is_dir() and not ratings_only:
         found.n_clips = sum(1 for _ in clips.glob("*.mp4"))
-    names = [clipset.CLIP_DIR, clipset.SEGMENTS_FILE, clipset.DESIGN_FILE,
-             clipset.SPENT_FILE,        # the time spent goes with the clips
-             shared_ratings.NOTE_FILE]  # ... and so does the note of what was uploaded
-    if recording:
+    names = [shared_ratings.NOTE_FILE]  # the note of what was uploaded goes with the labels
+    if not ratings_only:
+        names += [clipset.CLIP_DIR, clipset.SEGMENTS_FILE, clipset.DESIGN_FILE,
+                  clipset.SPENT_FILE]   # the time spent goes with the clips
+    if recording and not ratings_only:
         names.append(recording_store.FILE)
     found.delete = [folder / name for name in names if (folder / name).exists()]
     found.archive = sorted(folder.glob(ANNOTATIONS)) if folder.is_dir() else []

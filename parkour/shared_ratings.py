@@ -1,30 +1,35 @@
-"""Ratings in the shared folder on the RDM: names in use, and uploading.
+"""Saving a rater's finished labels under a dated name, and putting them on
+the RDM under that same name.
 
-    <share folder>/ratings/<subject>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv
+    on this computer   data4annotation/<subject>/<subject>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv
+    on the RDM         <share folder>/ratings/<the same file name>
 
-A rater's label file is copied here when they have labelled every clip. An
-upload never replaces an earlier one; the most recent file for a rater is the
-one that counts.
+When a rater has labelled every clip and reaches the finished page, the
+undated work-in-progress file (see annotations.py) is given its dated name:
+that is the save. The dated file is then copied to the RDM. The date and time
+are the moment of saving, so the names match even if the RDM could not be
+reached at once and the copy is made later. A dated file is never changed or
+replaced, here or on the RDM; the most recent one for a rater is the one that
+counts.
 
 Names. Two raters must not share a name. The sign-in page warns while a name
 is being typed (`taken_names`). The first upload from a computer checks
-again; on a clash it adds a random three-digit number. The name used is then
-remembered in local.toml as `uploaded_as`, and later uploads from the same
+again; on a clash it adds a random three-digit number, and the files saved so
+far on this computer are renamed to match. The name is then remembered in
+local.toml as `uploaded_as`, and later saves and uploads from the same
 computer use it without checking. So a rater must stay on one computer.
 
-On this computer, a small note beside the label file records what was last
-uploaded, so the same labels are not uploaded twice:
+On this computer, a small note beside the label files lists the dated files
+that have reached the RDM, so that each is uploaded once:
 
     data4annotation/<subject>/ratings_uploaded.json
 """
 
-import csv
-import hashlib
-import io
 import json
 import os
 import random
 import re
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +38,6 @@ from . import annotations, clipset, config, share
 from .share import Unreachable
 
 NOTE_FILE = "ratings_uploaded.json"
-STAMP = "%Y%m%d-%H%M%S"
 _FILE = re.compile(r"^(?P<subject>.+?)_(?P<name>.+)_annotations_(?P<stamp>\d{8}-\d{6})\.csv$")
 
 
@@ -48,13 +52,27 @@ class Shared:
 
 @dataclass
 class Outcome:
-    """What happened when the app tried to upload a rater's labels."""
+    """What happened when the app tried to upload a rater's saved labels."""
 
     status: str             # uploaded, unchanged, unreachable, no_clips or other_clips
-    name: str = ""          # the name the ratings are (or were last) uploaded under
+    name: str = ""          # the name the labels are saved and uploaded under
+    file: str = ""          # the newest saved file: its name here and on the RDM
     renamed: bool = False   # True if a number was added to the name just now
-    at: datetime | None = None          # when this upload, or the last one, was made
+    at: datetime | None = None          # when that file was saved
     previous: datetime | None = None    # an earlier upload that this one supersedes
+
+
+@dataclass
+class Standing:
+    """Where a rater's labels are, read from this computer alone (the RDM is
+    not asked, so pages can show this at once)."""
+
+    current: Path | None    # the file that holds the most recent labels
+    in_progress: bool       # True if there are changes not yet saved under a dated name
+    saved: str = ""         # the newest saved file's name, if any
+    saved_at: datetime | None = None
+    saved_as: str = ""      # the rater name in that file's name
+    uploaded: bool = False  # has that file reached the RDM?
 
 
 def shared(share_folder: Path, subject: str) -> list[Shared]:
@@ -69,7 +87,7 @@ def shared(share_folder: Path, subject: str) -> list[Shared]:
             match = _FILE.match(path.name)
             if match and match["subject"] == subject:
                 found.append(Shared(match["name"],
-                                    datetime.strptime(match["stamp"], STAMP), path))
+                                    datetime.strptime(match["stamp"], annotations.STAMP), path))
         return sorted(found, key=lambda s: s.at)
     return share.within(20, look)
 
@@ -89,71 +107,150 @@ def free_name(wanted: str, taken: set[str], rng: random.Random | None = None) ->
     return name
 
 
+def standing(subject: str, rater: str) -> Standing:
+    saved = annotations.saved_files(subject)
+    found = Standing(annotations.current_path(subject, rater),
+                     annotations.in_progress(subject, rater))
+    if saved:
+        found.saved = saved[-1].name
+        found.saved_as, found.saved_at = annotations.parse_dated(subject, saved[-1].name)
+        found.uploaded = saved[-1].name in _uploaded(subject)
+    return found
+
+
+def save_finished(subject: str, rater: str, now: datetime | None = None) -> Path | None:
+    """Give the work-in-progress file its dated name. This is the save.
+
+    Call it only when every clip has a label. Returns the new file, or None
+    if there was nothing in progress. Inside the file, the rater column
+    carries the name in the file's name. Needs no RDM.
+    """
+    working = annotations.path(subject, rater)
+    if not working.exists():
+        return None
+    name = (config.load_local() or {}).get("uploaded_as") or rater
+    target = annotations.dated_path(subject, name, now or datetime.now())
+    annotations.store(target, [{**row, "rater": name} for row in annotations.rows(working)])
+    working.unlink()
+    return target
+
+
 def upload(share_folder: Path, subject: str, rater: str, now: datetime | None = None) -> Outcome:
-    """Copy the rater's labels to the RDM, if there is anything new to copy.
+    """Save the rater's labels if any are in progress, then copy to the RDM
+    every saved file that is not there yet.
 
     Call this when every clip has a label. It never raises for an RDM that is
     out of reach: it reports `unreachable`, and the next call tries again.
+    The local save happens whatever the RDM does.
     """
-    local_file = annotations.path(subject, rater)
-    content = local_file.read_bytes()
-    digest = hashlib.sha256(content).hexdigest()
-    note = _read_note(subject)
-    if note.get("digest") == digest:
-        return Outcome("unchanged", note["name"], at=datetime.fromisoformat(note["at"]))
+    save_finished(subject, rater, now)
+    saved = annotations.saved_files(subject)
+    if not saved:
+        return Outcome("unchanged")
+    pending = [file for file in saved if file.name not in _uploaded(subject)]
 
+    def about(status: str, **more) -> Outcome:      # described by the newest saved file
+        name, at = annotations.parse_dated(subject, annotations.saved_files(subject)[-1].name)
+        return Outcome(status, name, annotations.saved_files(subject)[-1].name, at=at, **more)
+
+    if not pending:
+        return about("unchanged")
     try:
         on_rdm = share.shared_id(share_folder, subject)
         if on_rdm is None:
-            return Outcome("no_clips")          # the clips must be shared first
+            return about("no_clips")            # the clips must be shared first
         if on_rdm != clipset.set_id(subject):
-            return Outcome("other_clips")       # these labels are for different clips
+            return about("other_clips")         # these labels are for different clips
 
         remembered = (config.load_local() or {}).get("uploaded_as")
         earlier = shared(share_folder, subject)
         name = remembered or free_name(rater, {s.name for s in earlier})
+        if name != rater and not remembered:    # a clash, found only now: rename what was saved
+            pending = [_under_name(subject, file, name) for file in pending]
         mine = [s for s in earlier if s.name == name] if remembered else []
-        now = now or datetime.now()
-        target = (share_folder / share.RATINGS /
-                  f"{subject}_{name}_annotations_{now.strftime(STAMP)}.csv")
-        share.within(60, _write, target, _renamed(content, name))
+        for file in pending:
+            share.within(60, _copy, file, share_folder / share.RATINGS / file.name)
+            _note_uploaded(subject, file.name)
     except Unreachable:
-        return Outcome("unreachable")
+        return about("unreachable")
 
     if not remembered:
         config.set_local("uploaded_as", name)
-    _write_note(subject, {"digest": digest, "name": name, "file": target.name,
-                          "at": now.isoformat(timespec="seconds")})
-    return Outcome("uploaded", name, renamed=name != rater, at=now,
-                   previous=mine[-1].at if mine else None)
+    return about("uploaded", renamed=name != rater, previous=mine[-1].at if mine else None)
 
 
-def _renamed(content: bytes, name: str) -> bytes:
-    """The label file with `name` in the rater column of every row, so that
-    the file's name and its rows agree."""
-    rows = list(csv.DictReader(io.StringIO(content.decode("utf-8"), newline="")))
-    out = io.StringIO(newline="")
-    writer = csv.DictWriter(out, fieldnames=annotations.FIELDS)
-    writer.writeheader()
-    writer.writerows({**row, "rater": name} for row in rows)
-    return out.getvalue().encode("utf-8")
+def _under_name(subject: str, file: Path, name: str) -> Path:
+    """Rename a saved file so that it carries `name`, in its file name and in
+    its rater column. Used only before a file has ever been uploaded."""
+    _, at = annotations.parse_dated(subject, file.name)
+    target = annotations.dated_path(subject, name, at)
+    annotations.store(target, [{**row, "rater": name} for row in annotations.rows(file)])
+    file.unlink()
+    return target
 
 
-def _write(target: Path, content: bytes) -> None:
-    """Write under a temporary name, then rename: never a half-written file."""
+def _copy(source: Path, target: Path) -> None:
+    """Copy a saved file to the RDM under a temporary name, then rename it:
+    never a half-written file there, and never one replaced."""
     target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        return
     partial = target.with_name(target.name + share.PART)
-    partial.write_bytes(content)
+    partial.write_bytes(source.read_bytes())
     os.replace(partial, target)
 
 
-def _read_note(subject: str) -> dict:
+def _uploaded(subject: str) -> set[str]:
+    """Names of the saved files that have reached the RDM."""
     path = clipset.folder(subject) / NOTE_FILE
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
+        return set(json.loads(path.read_text(encoding="utf-8")).get("uploaded", []))
+    except (OSError, ValueError, AttributeError):
+        return set()
 
 
-def _write_note(subject: str, note: dict) -> None:
-    (clipset.folder(subject) / NOTE_FILE).write_text(json.dumps(note), encoding="utf-8")
+def _note_uploaded(subject: str, file_name: str) -> None:
+    names = sorted(_uploaded(subject) | {file_name})
+    (clipset.folder(subject) / NOTE_FILE).write_text(
+        json.dumps({"uploaded": names}), encoding="utf-8")
+
+
+# ---- Uploading in the background ----
+#
+# The RDM is slow, so a page must not wait for an upload. The finished page
+# starts one here, shows itself at once, and asks for the outcome until it
+# is there.
+
+_lock = threading.Lock()
+_running = False
+_outcome: tuple[str, str, Outcome] | None = None     # subject, rater, what happened
+
+
+def start(share_folder: Path, subject: str, rater: str) -> None:
+    """Begin uploading the rater's saved labels, unless an upload is already
+    under way. The outcome is picked up later with `outcome`."""
+    global _running, _outcome
+    with _lock:
+        if _running:
+            return
+        _running, _outcome = True, None
+
+    def work() -> None:
+        global _running, _outcome
+        try:
+            result = upload(share_folder, subject, rater)
+        except Exception:                   # anything unexpected: try again next time
+            result = Outcome("unreachable")
+        with _lock:
+            _running, _outcome = False, (subject, rater, result)
+
+    threading.Thread(target=work, daemon=True).start()
+
+
+def outcome(subject: str, rater: str) -> Outcome | None:
+    """What the last upload for this rater came to, or None while it is
+    still under way (or if none has been started)."""
+    with _lock:
+        if _running or _outcome is None or _outcome[:2] != (subject, rater):
+            return None
+        return _outcome[2]

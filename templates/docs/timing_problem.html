@@ -35,17 +35,12 @@ not. This page shows why.
     </figcaption>
   </figure>
   <div class="prose">
-    <div class="example">
-      <p><strong>An everyday picture.</strong> A wall clock and a pile of letters.</p>
-      <p>
-        Letters arrive one every minute. A clerk stamps each letter with the
-        time on the wall clock and files it. If the clerk steps out for ten
-        minutes, ten letters pile up. Back at the desk, the clerk stamps them
-        all quickly, with the time on the clock <em>now</em>. The first letter
-        in the pile gets a time ten minutes late. Two letters stamped within
-        the same minute get the same time.
-      </p>
-    </div>
+    <p>
+      When the main thread is held up, frames wait. It then saves them
+      quickly, one after another, each with the time that is in the shared
+      place at that moment, not the time the frame was filmed. Two frames
+      saved before the camera reads its next frame get the same time.
+    </p>
     <p>
       So a timestamp is <strong>never early</strong>. It can be late, by as
       much as the time the frame waited.
@@ -111,17 +106,24 @@ not. This page shows why.
   </section>
 
   <section class="prose">
-    <h2>A second, smaller problem</h2>
+    <h2>A different problem: missing frames</h2>
     <p>
-      One idea is to ignore the timestamps and count frames instead: frame
-      900 is 30 seconds in, at 30 frames a second.
+      Sometimes the camera hands over fewer than 30 frames in a second. The
+      frames that do arrive have the right timestamps. Some frames are simply
+      not there.
     </p>
     <p>
-      That does not work over long stretches. In every session there are a
-      few seconds for which <strong>no frames exist at all</strong> (between
-      0.6 and 17.7 s per session). Counting frames from the start would drift
-      by those seconds. So the timestamps are still needed. They only have to
-      be used with care.
+      Both problems make the steps between timestamps uneven, so they can
+      look alike. They are told apart by what comes next.
+    </p>
+    <ul>
+      <li><strong>Late timestamps:</strong> a gap, then a catch-up in which timestamps are bunched. After the catch-up, the number of frames and the clock agree again. No frame is missing.</li>
+      <li><strong>Missing frames:</strong> steps longer than 1/30 s with no catch-up after them. The number of frames falls behind the clock and stays behind.</li>
+    </ul>
+    <p>
+      Missing frames are why frames cannot simply be counted to tell the
+      time (frame 900 is 30 s in). Over a whole session the count falls
+      behind the clock by 0.6 to 17.7 s, depending on the participant.
     </p>
   </section>
 </div>

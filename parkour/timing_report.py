@@ -1,4 +1,4 @@
-"""Numbers and series for the timing pages, from one subject's videos.
+"""Numbers and series for the docs pages on timestamps, from one subject's videos.
 
 Pure calculation: no file access and no HTML. It measures how late the
 stamps are (`lag.py`), applies the rule that chooses clips (`timing.py`),
@@ -80,7 +80,10 @@ class Report:
     longest_step: float             # seconds
     share_late: float               # frames at least LATE_SECONDS late
     worst_lag: float                # seconds
-    missing_seconds: float          # session time for which no frames exist
+    missing_seconds: float          # session length by the stamps, minus frames at the nominal rate
+    missing_between: float          # of that, at the changes from one video file to the next
+    missing_within: float           # of that, inside videos
+    missing_worst: VideoLoss | None # the video with the most; its removed_seconds holds the amount
     steps: list[Band]
 
     stretch: Stretch | None
@@ -106,6 +109,14 @@ class Report:
     removed_seconds: float
     losses: list[VideoLoss]
 
+    clip_seconds: float             # what a clip is meant to cover
+    n_long_clips: int               # allowed clips whose stamps span more than that
+    longest_clip: float             # seconds from first to last stamp, the longest allowed clip
+
+    @property
+    def share_long_clips(self) -> float:
+        return self.n_long_clips / self.clips_allowed if self.clips_allowed else 0.0
+
     @property
     def share_kept(self) -> float:
         return self.clips_allowed / self.clips_possible if self.clips_possible else 0.0
@@ -126,6 +137,7 @@ class _Measured:
     removed: list[bool]
     allowed: int            # clip starts the rule allows
     possible: int
+    spans: list[float]      # seconds from first to last stamp, for each allowed clip
 
 
 def build(videos: list[Video], study: dict) -> Report | None:
@@ -158,6 +170,9 @@ def build(videos: list[Video], study: dict) -> Report | None:
         share_late=sum(x >= LATE_SECONDS for x in all_lags) / len(all_lags),
         worst_lag=max(all_lags),
         missing_seconds=_missing(usable, span),
+        missing_between=_missing(usable, span) - sum(_excess(v) for v in usable),
+        missing_within=sum(_excess(v) for v in usable),
+        missing_worst=_most_missing(usable, zone),
         steps=_bands([s * 1000 for s in all_steps], _step_bands(max_step)),
         stretch=_stretch(max(measured, key=lambda m: max(m.lags)), max_step),
         columns=columns,
@@ -180,6 +195,9 @@ def build(videos: list[Video], study: dict) -> Report | None:
         lost_tasks=[names[n] for n in sorted(tasks - alive)],
         removed_seconds=sum(sum(m.removed) / m.video.frame_rate for m in measured),
         losses=_losses(measured, zone),
+        clip_seconds=seconds,
+        n_long_clips=sum(s > seconds for m in measured for s in m.spans),
+        longest_clip=max((s for m in measured for s in m.spans), default=0.0),
     )
 
 
@@ -197,6 +215,7 @@ def _measure(video: Video, clip_seconds: float, max_step: float) -> _Measured | 
         removed=timing.removed_frames(len(times), starts, frames),
         allowed=len(starts),
         possible=len(times) - frames + 1,
+        spans=[(times[first + frames - 1] - times[first]) / 1e6 for first in starts],
     )
 
 
@@ -204,6 +223,28 @@ def _missing(usable: list[Video], span: int) -> float:
     """Session length by the stamps, minus the length the frames account for."""
     filmed = sum(len(v.times) / v.frame_rate for v in usable if v.frame_rate)
     return span / 1e6 - filmed
+
+
+def _excess(video: Video) -> float:
+    """Seconds by which a video is longer, by its stamps, than its frames
+    account for at the nominal rate. Frames that are missing make it positive."""
+    if not video.frame_rate:
+        return 0.0
+    return summary.duration(video) - (len(video.times) - 1) / video.frame_rate
+
+
+def _most_missing(usable: list[Video], zone: timezone) -> VideoLoss | None:
+    """The video whose stamps run furthest ahead of its frame count."""
+    worst = max(usable, key=_excess, default=None)
+    if worst is None or _excess(worst) <= 0:
+        return None
+    return VideoLoss(
+        label=_label(worst),
+        clock=_local(worst.times[0], zone).strftime("%H:%M:%S"),
+        seconds=summary.duration(worst),
+        removed_seconds=_excess(worst),
+        worst_lag_ms=0.0,
+    )
 
 
 def _bands(values: list[float], bands: list[tuple]) -> list[Band]:

@@ -2,6 +2,7 @@
 
     uv run python reset.py                 the participant named in local.toml
     uv run python reset.py Pxx             another participant folder
+    uv run python reset.py --ratings       only the labels: keep the clips, label them again
     uv run python reset.py --recording     also forget what was read from the videos
     uv run python reset.py --rater         also forget the rater's name
     uv run python reset.py --yes           do not ask before doing it
@@ -20,6 +21,8 @@ from parkour import config, reset
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("subject", nargs="?", help="participant folder; default: the one in local.toml")
+    parser.add_argument("--ratings", action="store_true",
+                        help="clear only the labels; the clips are kept")
     parser.add_argument("--recording", action="store_true",
                         help="also delete the saved read of the source videos")
     parser.add_argument("--rater", action="store_true",
@@ -32,7 +35,8 @@ def main() -> int:
         print("No participant given, and local.toml names none.")
         return 1
 
-    found = reset.plan(subject, recording=args.recording, rater=args.rater)
+    found = reset.plan(subject, recording=args.recording, rater=args.rater,
+                       ratings_only=args.ratings)
     if found.empty:
         print(f"Nothing to clear for {subject}.")
         return 0
@@ -48,7 +52,8 @@ def main() -> int:
             print("Nothing was changed.")
             return 1
     reset.apply(found)
-    print("\nDone. Start the app to generate clips and annotate afresh.")
+    print("\nDone. Start the app to label the clips afresh." if args.ratings else
+          "\nDone. Start the app to generate clips and annotate afresh.")
     return 0
 
 

@@ -9,7 +9,9 @@ See `README.md` for usage and `PLAN.md` for the design and open decisions.
 - Standard library first. Third-party packages are limited to Flask,
   and imageio-ffmpeg.
 - `app.py` holds routes only. Logic lives in the `parkour/` package.
-- Storage is plain CSV. No database.
+- Storage is plain CSV for the clip list and the labels. No database.
+  Small notes the app keeps for itself (the saved reading of the videos,
+  time spent, what was uploaded) are JSON files in the subject's folder.
 - The app never deletes clips or labels. Only `reset.py`, run by hand,
   clears a subject, and it moves annotation files to
   `data4annotation/_archive/` instead of deleting them.
@@ -103,6 +105,17 @@ the sync to the sensors remain to be done.
   128 ms late in five participants and 211 ms in one. The rule keeps 88 to
   97.5% of windows (76 to 95% of task video) and leaves 1 to 8 of the 91
   tasks with no usable window.
+- **Missing frames are a separate problem (found 2026-11-19, not acted
+  on).** The "time with no frames" above is frames the camera did not
+  deliver, not late stamps: steps longer than 1/30 s with no catch-up
+  after them. In the cleanest participant the session is 5.2 s short of
+  frames: 1.4 s at the 200 changes of video file, and 3.8 s in one 15 s
+  unlabelled video where the camera ran at about 20 fps. Elsewhere the
+  camera's rate is 30.00 fps. The timestamp rule does not catch this, so
+  0.28% of allowed windows (352 of 127,273) span more than 1 s by their
+  own stamps, the longest 1.96 s; such a clip plays faster than life.
+  Not measured for the other five participants. A possible rule: also
+  limit the time from a window's first stamp to its last. Not agreed.
 - **Jump recordings.** Used for syncing (see below). In most participants
   one or both jump recordings contain one to three repeated stamps or
   pauses, so they are not automatically clean.

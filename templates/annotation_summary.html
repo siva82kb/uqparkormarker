@@ -55,19 +55,22 @@
   </div>
 </section>
 
-<div class="pair">
+{# The table of counts is kept narrow, to leave room for the file paths. #}
+<div class="pair pair-paths">
   <section>
     <h2>Your labels so far</h2>
     <table>
       <thead>
-        <tr><th>Label</th><th class="num">Clips</th><th class="num">Share of labelled</th></tr>
+        <tr>
+          <th>Label</th>
+          {% for arm in arms %}<th class="num">{{ arm | capitalize }} arm</th>{% endfor %}
+        </tr>
       </thead>
       <tbody>
-        {% for name, count in counts.items() %}
+        {% for name, by_arm in counts.items() %}
         <tr>
           <td>{{ name }}</td>
-          <td class="num">{{ count }}</td>
-          <td class="num">{% if labelled %}{{ '%.0f' | format(100 * count / labelled) }}%{% else %}–{% endif %}</td>
+          {% for arm in arms %}<td class="num">{{ by_arm[arm] }}</td>{% endfor %}
         </tr>
         {% endfor %}
       </tbody>
@@ -76,12 +79,53 @@
 
   <section>
     <h2>Where they are saved</h2>
-    <dl class="facts">
-      <div><dt>File</dt><dd class="path">{{ file }}</dd></div>
-    </dl>
+    <table class="paths">
+      <thead>
+        <tr><th>Location</th><th>Path</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>On this computer</td>
+          {% if where.current %}<td class="path">{{ where.current }}</td>{% else %}<td>Nothing labelled yet</td>{% endif %}
+        </tr>
+        <tr>
+          <td>On the RDM</td>
+          {% if where.uploaded %}
+          <td class="path">{{ ratings_folder }}/{{ where.saved }}</td>
+          {% else %}
+          <td>Not uploaded yet</td>
+          {% endif %}
+        </tr>
+      </tbody>
+    </table>
+    {# A file with no date in its name is work in progress. A saved file has
+       the date and time of saving in its name, the same here and on the RDM. #}
     <p class="note" style="margin-top: 8px">
-      One row is added every time you label a clip. If you change a label,
-      the last row for that clip is the one that counts.
+      {% set saved_on = where.saved_at.strftime('%d %B %Y at %H:%M').lstrip('0') if where.saved_at else '' %}
+      {% if where.in_progress and where.saved %}
+      <strong>You have changes that are not saved yet.</strong> They are in the file
+      with no date in its name. Your last save, on {{ saved_on }}, is
+      <code>{{ where.saved }}</code>. The changes are saved, under a new date and
+      time, when you next reach the finished page.
+      {% elif where.in_progress %}
+      Your labels are in a file with no date in its name while you work. When
+      every clip is labelled, the file is saved with the date and time in its
+      name, and a copy with the same name goes to the RDM.
+      {% elif where.saved and where.uploaded %}
+      Saved on {{ saved_on }}{% if where.saved_as != rater %}, under the name
+      <strong>{{ where.saved_as }}</strong>{% endif %}. The file has the same name on this
+      computer and on the RDM. Nothing has changed since.
+      {% elif where.saved %}
+      Saved on this computer on {{ saved_on }}, but <strong>not on the RDM yet</strong>.
+      The app tries again each time the finished page is opened.
+      {% else %}
+      Nothing has been labelled yet.
+      {% endif %}
+    </p>
+    <p class="note">
+      A file has one row for each clip, holding the labels for both arms. If
+      you change a label after a save, a new file is made with the change in
+      it; the earlier file is kept as it was.
     </p>
   </section>
 </div>

@@ -119,16 +119,36 @@ One page, in place of typing into `local.toml`:
 
 - When a rater has labelled every clip, the app copies their label file to
   `ratings/` by itself. Nothing is pressed.
-- The copy is named as on the rater's computer, with the upload name and
-  the date and time added: `<Pxx>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv`.
-  Inside the copy, the `rater` column carries the upload name, so the file
-  name and its rows agree. The file on the rater's computer is not changed.
+- The annotation summary shows where the labels are in both places: the
+  file on this computer (the undated one while work is in progress, else the
+  newest dated one), and the same dated name on the RDM, or "Not uploaded
+  yet". It says when there are changes that have not been saved. This is
+  read from the files and the note on the computer, so the page does not go
+  to the RDM for it.
+- **The finished page never waits for the RDM.** Pressing Next on the last
+  clip shows the finished page at once, with the labels table. The upload
+  runs in the background; the page says "Uploading your labels to the RDM…"
+  with a pulsing dot, and puts the result in its place when it is in. The
+  labels are already saved on the rater's computer by then, so the rater
+  need not wait.
+- **The file has the same name on the rater's computer and on the RDM**,
+  and the same contents: `<Pxx>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv`.
+  It is the dated file made by the save (section 6). The date and time are
+  when the rater finished, not when the copy reached the RDM. Inside it,
+  the `rater` column carries the name in the file name.
 - An upload never replaces an earlier one. **The most recent file for a
   rater is the one that counts.** When an earlier one exists, the page says
   so, with its date, and that the new one is now the most recent.
-- If nothing has changed since the last upload, nothing is uploaded again.
+- If nothing has changed since the last save, nothing is saved or uploaded
+  again.
 - If a rater changes a label after finishing, the next visit to the
-  finished page uploads a new file.
+  finished page saves a new dated file and uploads it. Each file is
+  complete by itself, with one row per clip.
+- If the rater's name gets a number at the first upload because of a clash,
+  the files already saved on that computer are renamed to match, so the
+  names stay the same in both places.
+- A small note on the computer, `ratings_uploaded.json`, lists the dated
+  files that have reached the RDM, so each is uploaded once.
 - **Ratings are held back**, and the page says why, in two cases: the RDM
   has no zip for the participant yet (the clips must be shared first), or
   the clips on this computer are not the shared set (the person should run
@@ -208,9 +228,9 @@ title bar itself links only to the two summaries and the docs (section 3a).
 **Settings mismatch.** Each clip folder holds `design.toml`, a copy of the
 settings it was made with. If it differs from the current `study.toml` in any
 way (sampling settings, clip settings or labels), the app stops. The message
-lists the settings that differ, names the folder to delete by hand, and warns
-that annotation files are in that folder and should be moved out first. The
-app never deletes or overwrites clips itself.
+lists the settings that differ and says to run `reset.py` (below), which
+clears the old clips and sets any annotation files aside. The app never
+deletes or overwrites clips itself.
 
 **Folder names.** Clips are matched to source videos by subject folder name.
 A renamed clip folder is treated as no clips.
@@ -228,7 +248,11 @@ data4annotation/<subject>/
     clips/seg_0001.mp4 ...
     generation_time.json                time spent generating so far, over every run
     <subject>_<rater>_annotations.csv   one file per rater
+    ratings_uploaded.json               what was last uploaded to the shared folder
 ```
+
+A label file left from an earlier layout is renamed with `_older_layout_`
+and a date in its name (section 6), and stays in the folder.
 
 If this folder is copied to a rater's machine with the clips already in it,
 that rater needs no access to the source videos.
@@ -241,11 +265,12 @@ run by hand, with the app stopped: `uv run python reset.py`.
 
 | File in `data4annotation/<subject>/` | What a reset does |
 |---|---|
-| `clips/`, `segments.csv`, `design.toml` | Deleted. They can be made again. |
+| `clips/`, `segments.csv`, `design.toml`, `generation_time.json`, `ratings_uploaded.json` | Deleted. They can be made again. |
 | `<subject>_<rater>_annotations.csv` | Never deleted. Moved to `data4annotation/_archive/<subject>_<date>-<time>/`. |
 | `recording.json.gz` | Kept, unless `--recording` is given. |
 
-The rater's name in `local.toml` is kept unless `--rater` is given. The
+The rater's name in `local.toml` is kept unless `--rater` is given;
+`--rater` also removes the name used for uploads (`uploaded_as`). The
 program lists what it will do and asks for the subject's name to be typed
 before doing it (`--yes` skips the question). A subject other than the one
 in `local.toml` can be named: `uv run python reset.py Pxx`. The app itself
@@ -309,8 +334,14 @@ The early test recording in `data/221125_SK_Test` has an older layout
 
 ## 3a. Title bar, annotation summary and docs
 
-Addresses: `/` home, `/signin`, `/summary` (and `/summary/reread`), `/generate`, `/annotate`,
-`/done`, `/annotations`, `/docs` and `/docs/<slug>`.
+Addresses of pages: `/` home, `/setup`, `/fetch` (download clips),
+`/upload` (upload clips), `/summary`, `/generate`, `/signin`, `/annotate`
+(and `/annotate/<position>`), `/done`, `/annotations`, `/docs` and
+`/docs/<slug>`. Addresses that pages call in the background:
+`/summary/status`, `/summary/reread`, `/generate/status`,
+`/transfer/<kind>/status`, `/signin/check`, `/annotate/confirm`,
+`/done/outcome`, `/clips/<code>/<clip>.mp4`, and `/dev/stamp` in developer
+mode only.
 
 **Title bar.** Three links only: *Data summary*, *Annotation summary* and
 *Docs*. There are no links for the steps of normal use (generating clips,
@@ -319,8 +350,8 @@ the page that matches the state of the clips (section 1), and pages offer
 the next step as a button when it is available.
 
 **Annotation summary** (`/annotations`). For the signed-in rater: how many
-clips there are, how many are labelled, the count of each label, and where
-the annotation file is. It shows a "Start annotating" or "Continue
+clips there are, how many are labelled, the count of each label for each
+arm, and where the annotation file is. It shows a "Start annotating" or "Continue
 annotating" button only when every clip has been generated and the settings
 match.
 
@@ -355,6 +386,11 @@ groups, the order, the addresses (`/docs/<slug>`) and "previous" and "next".
   that limit is the least the stamp can be late. It is a measurement only.
 - A frame is **removed** if no allowed window can contain it, and **kept**
   otherwise.
+- **Missing frames** are reported apart from late stamps: how far the
+  session's frame count falls behind its stamps, how much of that is at
+  changes of video file and how much inside videos, and how many allowed
+  windows span more than `window_seconds` by their own stamps. The rule
+  does not remove such windows; whether it should is open (`CLAUDE.md`).
 - Pictures marked "Made-up example" come from `timing_sketch.py`, a small
   model of the recorder. Pictures marked "Measured" come from
   `timing_report.py`. Orange always means a late stamp or a removed frame.
@@ -395,7 +431,9 @@ groups, the order, the addresses (`/docs/<slug>`) and "previous" and "next".
 - `start_time` and `end_time` in `segments.csv` are the timestamps of the
   window's first and last frame, so they are one frame short of
   `window_seconds` apart.
-- Up to 500 per subject. Fewer if the subject has less usable footage.
+- Up to `n_segments` per subject (`study.toml`). It is set low while the
+  app is being tested; 500 is the number planned. Fewer are made if the
+  subject has less usable footage.
 - The random seed for choosing windows is fixed in `study.toml`, so every
   rater gets the same windows and clips for a given subject (see decision A).
 
@@ -463,11 +501,42 @@ start_time, end_time, task`.
   name once, cleans it into a file-safe form and saves it there.
 - The clip loops, muted. Five labels, keys `1`–`5`: the four FAABOS
   categories and "Unknown / arm out of view".
-- **Shift must be held to label**, with a number key or with a click. A key
-  or a click without Shift saves nothing and the page says why, so a slip of
-  the hand is never saved as a label. While Shift is down the labels light up.
-- `Backspace` (no Shift) shows the clip before, with the label it was given.
-  Labelling it again changes the label. A rater can look back but not ahead.
+- **Each clip gets two labels, one for each arm.** Right and left always
+  mean the participant's own right and left.
+- **Layout.** The clip is in the middle with a set of the five labels on
+  either side. The rater is looking at the participant, as a clinician
+  looks at a patient, so the participant's right arm is on the left of the
+  picture when they face the camera. The right arm's labels are therefore
+  on the left of the clip and the left arm's on the right. The page reminds
+  the rater that when the participant turns away the arms swap sides on the
+  screen, and to follow the body. The order of the two sets is
+  `annotations.ARMS`.
+- **Labelling.** `A` or `R` chooses the right arm, and `F` or `L` the left
+  arm (capital or small). `A` and `F` are there so that the hand resting on
+  `1`–`5` does not have to move; `R` and `L` are the initials. The keys are
+  `annotations.ARM_KEYS` and are shown on each arm's heading. Only then do
+  that arm's labels work: `1`–`5` gives it a label, or one of its labels is
+  clicked. No Shift is needed. The other arm's label buttons are off, and so
+  are both arms' until an arm is chosen. A number, or a click on a label
+  that is off, does nothing, and the page says to choose an arm first. Each
+  new clip starts with no arm chosen, so a stray number or click cannot
+  label anything. The label an arm already has stays clearly marked while
+  its buttons are off.
+- **Moving on is the step that records.** Choosing a label only marks it on
+  the page. The clip stays on screen showing both choices, so a wrong press
+  can be put right. The rater moves on with the Next button or the right
+  arrow key, and only when both arms have a label; that writes both labels
+  together into the clip's row. Pressing Next on a clip whose labels have not
+  changed writes nothing. The left arrow key, or Previous, goes back one
+  clip, showing the labels saved for it. A rater can go back to any clip and
+  forward as far as the first unfinished one.
+- **A press on Next is answered at once.** The line under the clip says
+  "Saving…" (or "Saved. That was the last clip…") and the button dims, so
+  the rater is never left wondering whether the press was taken.
+- **What is not saved.** Labels marked but not confirmed with Next are
+  dropped if the rater goes back, or closes the page or the app. At most
+  one clip has to be labelled again. This is accepted in exchange for a
+  label file with one clean row per clip.
 - The page shows only the clip, its place ("Clip 8 of 500") and a progress
   bar. It does not show the task or the video file, so the rater is not led.
 - **A clip from an earlier set must never be shown.** Clip numbers are
@@ -480,12 +549,36 @@ start_time, end_time, task`.
   the browser is told to store nothing (`Cache-Control: no-store`), with no
   fetching of the next clip in advance.
 - Presentation order is shuffled per rater, seeded from the rater's name.
-- Each label is appended to the CSV and written to disk at once. Columns:
-  `segment_id, label, rater, annotated_at`. A relabel adds a row; the latest
-  row for a clip counts.
-- On reopening, the app goes to the first clip without a label.
-- When every clip has a label, a page shows the count per label and where
-  the file is.
+- **The label file has exactly one row per clip.** Columns: `segment_id,
+  right_label, left_label, rater, annotated_at`. A clip counts as labelled
+  once it has a row. If a clip's labels are changed, its row is rewritten;
+  no row is added. The file is rewritten safely: the new version is written
+  under a temporary name and then swapped in.
+- **The file name says where things stand.**
+  - `<subject>_<rater>_annotations.csv`, with no date, is work in progress.
+    It holds changes that have not been saved, and is what the app shows.
+  - `<subject>_<name>_annotations_<YYYYMMDD-HHMMSS>.csv` is a save. The same
+    name is used on the RDM. If only dated files exist, the newest is what
+    the app shows.
+- **Saving.** When every clip is labelled and the rater reaches the
+  finished page, the undated file is given its dated name. That is the
+  save; the date and time are that moment. It happens on the rater's
+  computer whether or not the RDM can be reached. The dated file is then
+  copied to the RDM under the same name (ICORR section).
+- **A change after a save** starts a new undated file: a full copy of the
+  newest dated file with the changed row rewritten. Dated files are never
+  touched, so they are the record of what was saved before. The new file is
+  saved under a new date and time the next time the finished page is
+  reached, including after the app has been closed and started again.
+- A change made before the first save leaves no trace: the row is simply
+  rewritten.
+- A label file with an earlier layout (one label per clip, or one row per
+  arm) has other columns. Its rows are not used. When the first new row is
+  saved, that file is renamed with `_older_layout_` and a date in its name,
+  never deleted, and a fresh file is started.
+- On reopening, the app goes to the first clip that still needs a label.
+- When every clip has both labels, a page shows the count per label for
+  each arm and where the file is.
 - The annotation summary (section 3a) shows the same counts at any time,
   with progress, and is the only place outside the home page that offers
   annotation.
@@ -498,8 +591,8 @@ pyproject.toml      pinned Python version and packages
 uv.lock             exact package versions, written by uv
 .python-version     the Python version uv downloads
 tests/              unit tests (standard-library unittest, no participant data)
-study.toml          every design choice: labels, segment count, window length, seed, sampling strategy, timestamp rule, clip quality
-local.toml          data source, source-video folder, subject and rater name; written by the app (ignored by git). Optional `clip_limit` for testing with a few clips
+study.toml          every design choice: labels, segment count, share from task video, window length, seed, sampling strategy, timestamp rule, clip quality; and the name of the shared folder
+local.toml          study folder, subject, rater name and the name used for uploads; written by the app (ignored by git). Optional `clip_limit` for testing with a few clips
 app.py              Flask routes only; no logic
 reset.py            run by hand: clear a subject's clips and set its labels aside, to start afresh
 parkour/
@@ -519,14 +612,14 @@ parkour/
     docs.py         the list of docs pages: groups, order and addresses; the study.toml values they quote
     summary.py      build the data summary
     sampling/       one file per sampling strategy, chosen by name in study.toml
-    clipset.py      a subject's clip folder: segments.csv, design.toml, which clips exist
+    clipset.py      a subject's clip folder: segments.csv, design.toml, which clips exist, time spent, and the two set codes
     extract.py      cut clips with ffmpeg in a background thread; progress tracking
     fmt.py          format values for display
     devreload.py    developer mode (`app.py --dev`): tell the open page when the app's files change
-    annotations.py  a rater's clip order; read and append the annotation CSV
+    annotations.py  a rater's clip order; read and append the annotation CSV (two labels per clip, one for each arm)
     reset.py        what a reset removes, keeps and sets aside
 templates/          base, setup, unreachable, transfer, signin, loading, summary, generate, mismatch,
-                    annotate, done, annotation_summary
+                    annotate, done, _upload_outcome (part of done), annotation_summary
 templates/docs/     the docs pages: shared frame, contents, figures, one file per page
 static/             style.css, app.js, fonts/
 data4annotation/    clips and annotations (ignored by git); _archive/ holds labels set aside by a reset
@@ -554,7 +647,10 @@ Montserrat for headings and figures, Roboto for text. Both are bundled in
 first run. The title bar stays at the top of the window while scrolling. Pages
 that are read (setup, messages) sit in a narrow centred column; pages that
 show data (summaries, docs) use the window width, up to about 1230 px. A
-docs page has its sections in a column on the left that stays in view.
+docs page has its sections in a column on the left that stays in view;
+beside it, text, boxes, tables and pictures all run the same width, so
+every block ends at the same right edge. Docs pages explain with worked
+examples in real numbers and do not use everyday comparisons.
 Orange is used for one thing only: a late timestamp or a removed frame, in
 the docs figures. No front-end framework and no build step: plain HTML, one
 stylesheet, one small script.
@@ -580,8 +676,10 @@ packages the raters will get. `uv.lock` is committed.
    `timing_sketch.py`, `chart.py`, the contents page and six pages (done;
    checked on one participant). Annotation summary page (done).
 5. `annotations.py`, sign-in, annotate and done pages (done; checked on 25
-   clips of one participant, including the Shift rule in a browser)
-5a. ICORR sharing: share.py, shared_ratings.py, 	ransfer.py; the setup,
+   clips of one participant). Since changed to two labels per clip, one for
+   each arm, saved as one row when the rater presses Next (done; keys,
+   clicks and arrows checked in a browser)
+5a. ICORR sharing: `share.py`, `shared_ratings.py`, `transfer.py`; the setup,
    download, upload and "not reachable" pages; the name check at sign-in;
    ratings uploaded from the finished page (done; checked against a folder
    standing in for the RDM, not yet against the RDM itself)
@@ -604,13 +702,13 @@ in the code.
 | A | Should both raters label the same windows? | Yes. The seed for choosing windows is fixed, so all raters get the same clips for a subject. The order in which clips are shown is shuffled with a seed from the rater's name. |
 | B | The category labels | FAABOS: Task-related functional, Non-task-related functional, Non-functional, No activity/movement. Wording taken from the literature; to be checked against the study protocol. |
 | O | Fifth option | Yes: "Unknown / arm out of view". |
-| E | Number of windows | Up to 500 per subject. |
+| E | Number of windows | Up to 500 per subject is the plan. The number in use is `n_segments` in `study.toml`, set low while the app is tested. |
 | F | Where the source videos are | On the RDM, read through the mapped drive. The path is set in `local.toml`. Clips and annotations stay in `data4annotation/` in the repo folder. |
 | M | How `uv` arrives | Downloaded by `run.bat` on first run. Not committed. |
 | N | GitHub repo | Private. Access is given to the appropriate people. |
 | P | Rater machines | Most likely 64-bit Windows. `run.bat` is Windows only. |
-| C | Which videos to sample from | All video, task and unlabelled, uniform over recorded time. |
-| D | What the rater sees | The 1 s clip only, looping. No context clip. |
+| C | Which videos to sample from | All video, task and unlabelled. Within each kind, every allowed clip is equally likely; the mix of the two kinds is fixed (decision AD). |
+| D | What the rater sees | The 1 s clip only, looping. No context clip. Each clip is labelled twice, once for each arm (section 6). |
 | G | Web server | Flask. |
 | H | How raters start the app | Download the repo from GitHub and double-click `run.bat`. It uses `uv` to fetch Python and the packages on first run, so the first run needs internet. No PyInstaller `.exe`. |
 | I | Third-party packages | Flask and imageio-ffmpeg only. No h5py. Sensor files are not used. |
@@ -622,13 +720,13 @@ in the code.
 | T | Raters with ready-made clips and no RDM access | Handled by the first setup question. The clips route asks for no path and goes straight to annotation. |
 | U | Interrupted generation | Resumes automatically from the first missing clip, reusing the saved window list. |
 | V | Clips made with different settings | Any difference from `study.toml`, labels included, stops the app with a message. The clips are cleared with `reset.py`, run by hand; the app never deletes clips. |
-| AC | Starting afresh | `reset.py` deletes a subject's clips, `segments.csv` and `design.toml`, and moves annotation files to `data4annotation/_archive/`. Labels are never deleted. |
+| AC | Starting afresh | `reset.py` deletes a subject's clips, `segments.csv`, `design.toml` and the two small notes that go with them, and moves annotation files to `data4annotation/_archive/`. Labels are never deleted. |
 | W | Mapping the RDM drive | Done by the rater in Windows. The setup page shows short instructions. |
 | X | Participants with session subfolders | Left out of the subject list for now. Only participants whose videos sit directly in `Video/`, with no subfolders there, are offered. |
 | Y | Length of a clip | A fixed number of frames per video: `window_seconds` times the nominal frame rate. Every clip plays for the same time. |
 | Z | Late frame timestamps | Quickest fix for now: windows containing a repeated stamp or a step over 0.1 s are never sampled. No times are corrected. A proper fix, and syncing to the sensors, are parked (see `CLAUDE.md`). |
 | AA | Participant for the first paper | One participant, the one whose timestamps are least affected. The subject in use is set in `local.toml`. |
-| AB | Mix of task and unlabelled clips | 70% of clips from task video and 30% from unlabelled video, for now (`task_share` in `study.toml`). The two kinds are sampled separately. |
+| AD | Mix of task and unlabelled clips | 70% of clips from task video and 30% from unlabelled video, for now (`task_share` in `study.toml`). The two kinds are sampled separately. |
 | L | Guarding against design changes | Settings in `study.toml`; sampling strategies swappable by name; `dataset.py` is the only module that knows the folder layout; each generated set saves a copy of the settings and seed it was made with. |
 
 ### Still open

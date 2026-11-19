@@ -310,25 +310,23 @@ def _annotation():
     return (subject, rater, study, ordered, annotations.read(subject, rater)), None
 
 
-@app.route("/annotate", methods=["GET", "POST"])
+@app.route("/annotate")
 @app.route("/annotate/<int:position>")
 def annotate_page(position: int | None = None):
-    """Show a clip to label. POST saves a label and moves to the next clip
-    without one. A position shows an earlier clip again, to change its label."""
+    """Show a clip, with a set of labels for each arm.
+
+    With no position, the first clip that still needs a label. A position
+    shows that clip, to label it or to change a label; a rater can go back to
+    any earlier clip, and forward only as far as the first unfinished one.
+    Choosing labels saves nothing and does not move on. The rater confirms
+    with Next, which saves both labels in one row (see annotate_confirm).
+    """
     found, elsewhere = _annotation()
     if found is None:
         return elsewhere
     subject, rater, study, ordered, labels = found
-    by_key = {label["key"]: label["name"] for label in study["labels"]}
 
-    if request.method == "POST":
-        segment_id, key = request.form.get("segment_id"), request.form.get("key")
-        if key not in by_key or segment_id not in {s.segment_id for s in ordered}:
-            abort(400)
-        annotations.append(subject, rater, segment_id, by_key[key])
-        return redirect(url_for("annotate_page"))
-
-    upcoming = annotations.next_position(ordered, labels)   # first clip without a label
+    upcoming = annotations.next_position(ordered, labels)   # first clip not fully labelled
     if position is None:
         if upcoming is None:
             return redirect(url_for("done_page"))
@@ -338,17 +336,44 @@ def annotate_page(position: int | None = None):
         return redirect(url_for("annotate_page"))
 
     clip = ordered[position]
+    last = position == len(ordered) - 1
     return render_template(
         "annotate.html",
         clip=clip,
         position=position,
         total=len(ordered),
-        labelled=sum(s.segment_id in labels for s in ordered),
+        labelled=annotations.n_complete(ordered, labels),
         labels=study["labels"],
-        current=labels.get(clip.segment_id),
-        reviewing=position != upcoming,
+        arms=annotations.ARMS,
+        arm_keys=annotations.ARM_KEYS,
+        current=labels.get(clip.segment_id, {}),
+        previous_url=url_for("annotate_page", position=position - 1) if position else "",
+        next_url=url_for("done_page") if last else url_for("annotate_page", position=position + 1),
         clip_set=clipset.set_code(subject),
     )
+
+
+@app.route("/annotate/confirm", methods=["POST"])
+def annotate_confirm():
+    """The rater has pressed Next: record the clip's two labels in its row,
+    then show the next clip. If the labels are the ones already there,
+    nothing is written."""
+    found, elsewhere = _annotation()
+    if found is None:
+        return elsewhere
+    subject, rater, study, ordered, labels = found
+    by_key = {label["key"]: label["name"] for label in study["labels"]}
+    segment_id = request.form.get("segment_id")
+    keys = {arm: request.form.get(arm) for arm in annotations.ARMS}
+    position = next((i for i, s in enumerate(ordered) if s.segment_id == segment_id), None)
+    if position is None or any(key not in by_key for key in keys.values()):
+        abort(400)
+    both = {arm: by_key[key] for arm, key in keys.items()}
+    if labels.get(segment_id) != both:
+        annotations.save(subject, rater, segment_id, both)
+    if position == len(ordered) - 1:
+        return redirect(url_for("done_page"))
+    return redirect(url_for("annotate_page", position=position + 1))
 
 
 @app.route("/clips/<clip_set>/<segment_id>.mp4")
@@ -385,18 +410,36 @@ def done_page():
     if annotations.next_position(ordered, labels) is not None:
         return redirect(url_for("annotate_page"))
     names = [label["name"] for label in study["labels"]]
-    # Every clip is labelled: the labels go to the RDM by themselves.
-    local = config.load_local()
-    uploaded = shared_ratings.upload(share.root(local, study), subject, rater)
+    # Every clip is labelled. First the save: the file gets its dated name,
+    # on this computer, at once. Then the same file goes to the RDM by
+    # itself. The RDM is slow, so that runs in the background and this page
+    # shows at once; it then asks done_outcome for the result.
+    shared_ratings.save_finished(subject, rater)
+    shared_ratings.start(share.root(config.load_local(), study), subject, rater)
     return render_template(
         "done.html",
         subject=subject,
         total=len(ordered),
         counts=annotations.counts(ordered, labels, names),
-        file=annotations.path(subject, rater),
+        arms=annotations.ARMS,
+        file=annotations.current_path(subject, rater),
         last=len(ordered) - 1,
-        uploaded=uploaded,
-        rater=rater,
+    )
+
+
+@app.route("/done/outcome")
+def done_outcome():
+    """For the finished page: what the upload of the labels came to, as a
+    piece of page. Empty, with status 202, while the upload is under way."""
+    local = config.load_local()
+    if not (local and local.get("rater")):
+        abort(404)
+    uploaded = shared_ratings.outcome(local["subject"], local["rater"])
+    if uploaded is None:
+        return "", 202
+    return render_template(
+        "_upload_outcome.html", uploaded=uploaded, rater=local["rater"],
+        ratings_folder=f"{config.load_study()['share']['folder']}/{share.RATINGS}",
     )
 
 
@@ -418,10 +461,12 @@ def annotation_summary():
         "annotation_summary.html",
         subject=subject,
         total=len(ordered),
-        labelled=sum(s.segment_id in labels for s in ordered),
+        labelled=annotations.n_complete(ordered, labels),
         ready=state == "complete" and not clipset.design_differences(subject, study),
+        arms=annotations.ARMS,
         counts=annotations.counts(ordered, labels, names),
-        file=annotations.path(subject, rater),
+        where=shared_ratings.standing(subject, rater),
+        ratings_folder=f"{study['share']['folder']}/{share.RATINGS}",
     )
 
 

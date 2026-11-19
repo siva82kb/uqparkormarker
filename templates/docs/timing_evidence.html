@@ -110,16 +110,27 @@ files. Nothing here is made up, and nothing is corrected.
   </section>
 
   <section class="prose">
-    <h2>Time with no frames</h2>
+    <h2>Missing frames</h2>
     <p>
       From first timestamp to last, the session lasts
-      {{ '%.1f' | format(r.missing_seconds) }} s longer than its frames
-      account for at 30 frames a second. For that time there are no frames at
-      all.
+      <strong>{{ '%.1f' | format(r.missing_seconds) }} s longer</strong> than
+      its {{ '{:,}'.format(r.n_frames) }} frames account for at 30 frames a
+      second. So about {{ '{:,.0f}'.format(r.missing_seconds * 30) }} frames
+      are missing. This is a different thing from late timestamps: see the
+      first page.
     </p>
+    <ul>
+      <li>{{ '%.1f' | format(r.missing_between) }} s is at the changes from one video file to the next. A little is lost each time a new file is started.</li>
+      <li>{{ '%.1f' | format(r.missing_within) }} s is inside videos.{% if r.missing_worst %} The largest part is in one video ({{ r.missing_worst.label | lower }}, starting {{ r.missing_worst.clock }}, {{ r.missing_worst.seconds | duration }} long), which is {{ '%.1f' | format(r.missing_worst.removed_seconds) }} s short of frames.{% endif %}</li>
+    </ul>
     <p>
-      This is why frame counting cannot replace the timestamps over a whole
-      session.
+      The rule on the next page does not look for missing frames. A clip is
+      always the same number of frames, so a clip cut where
+      frames are missing covers more than {{ '%g' | format(r.clip_seconds) }} s
+      of real time. Of the clips the rule allows,
+      <strong>{{ '{:,}'.format(r.n_long_clips) }} ({{ r.share_long_clips | share }})</strong>
+      cover more than {{ '%g' | format(r.clip_seconds) }} s by their own
+      timestamps. The longest covers {{ '%.2f' | format(r.longest_clip) }} s.
     </p>
   </section>
 </div>

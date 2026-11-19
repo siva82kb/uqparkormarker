@@ -3,7 +3,8 @@
 A small local web app for labelling functional upper-limb use in the UQ Parkour
 study videos. It draws random 1-second windows from a participant's videos,
 cuts them into short clips, and shows them one at a time to a rater, who
-assigns each clip a FAABOS category.
+gives each clip two FAABOS categories: one for the participant's right arm
+and one for their left.
 
 Everything runs on the rater's own computer. Clips and finished ratings are
 shared between raters through the study's own research data storage (the
@@ -69,12 +70,14 @@ the RDM while this setting is on.
 2. **Shows the data summary**: number of videos, recorded time, frame rate, a
    timeline of task and unlabelled video, problems found in the files, gaps,
    and the list of tasks.
-3. **Generates the clips.** "Generate clips" chooses up to 500 random,
-   non-overlapping 1 s windows (both numbers are set in `study.toml`), 70% of
-   them from task video and 30% from unlabelled video (`task_share` in the
-   same file), and cuts each into an MP4 clip, showing
+3. **Generates the clips.** "Generate clips" chooses random,
+   non-overlapping 1 s windows, 70% of them from task video and 30% from
+   unlabelled video, and cuts each into an MP4 clip, showing
    progress. If the app is closed part-way, it carries on from the first
-   missing clip next time. When all clips are cut, the page lists every clip
+   missing clip next time. How many clips, how long they are and the share
+   from task video are set in `study.toml` (`n_segments`, `window_seconds`,
+   `task_share`); the number is kept low while the app is being tested.
+   When all clips are cut, the page lists every clip
    with its start time, says that no two clips share a frame, and shows an
    "Annotate clips" button to go on to labelling.
 
@@ -116,23 +119,40 @@ ICORR27 Annotate/
   on one computer:** the app recognises a rater by the computer they use.
 - **If the RDM cannot be reached,** the app says so and tries again the next
   time the page is opened. Labels stay safe on the rater's computer.
+
 ## Labelling clips
 
-Each clip plays in a loop. Under it are the five labels, numbered 1 to 5.
+Each clip plays in a loop, and you give it **two labels: one for the
+participant's right arm and one for their left arm.** The five labels,
+numbered 1 to 5, appear twice, on either side of the clip.
 
-- **To label a clip, hold Shift and press its number, or hold Shift and click
-  it.** The next clip then appears.
-- A number key or a click *without* Shift does nothing. This is on purpose,
-  so that a slip of the hand is never saved as a label. The labels light up
-  while Shift is down.
-- Use the number keys in the top row of the keyboard, not the number pad.
-- **Backspace** shows the clip before, with the label you gave it. Label it
-  again to change it.
-- You can stop at any time. Each label is saved the moment you give it, and
-  the app carries on from the first unlabelled clip next time.
+- **Right and left mean the participant's own arms.** You are looking at the
+  participant, so when they face you their right arm is on the left of the
+  picture. That is why the right arm's labels are on the left. When they
+  turn away, the arms swap sides on the screen: follow the body, not the
+  side of the screen.
+- **First choose the arm:** press **A** or **R** for the right arm, **F** or
+  **L** for the left arm. That arm's labels come on. A and F are next to the
+  number keys, so one hand can do everything.
+- **Then give the label:** press **1 to 5**, or click one of that arm's
+  labels.
+- Labels are off until their arm is chosen. A click or a number before that
+  does nothing, on purpose, so that a slip of the hand is not saved.
+- Choosing a label only marks it. The clip stays on screen showing both
+  choices. If you pressed the wrong one, just choose again.
+- **To save and move on, press the right arrow key or the Next button.**
+  This works only when both arms have a label. Nothing is saved until you
+  do this; it is a separate step on purpose, so that a slip of the hand can
+  be put right first.
+- **The left arrow key, or Previous,** shows the clip before, with the
+  labels you saved for it. Labels you had marked but not yet saved with
+  Next are dropped.
+- You can stop at any time. The app carries on from the first clip that has
+  not been saved. If you stop with a clip marked but not saved, you will
+  label that one clip again.
 
-When every clip is labelled, the app shows how many clips got each label and
-where your file is.
+When every clip is labelled, the app shows how many clips got each label on
+each arm, and where your file is.
 
 ## Finding your way around
 
@@ -140,7 +160,7 @@ The title bar has three links.
 
 - **Data summary**: what was recorded for the participant.
 - **Annotation summary**: how many clips you have labelled, the count of
-  each label, and where your file is. The button to start or continue
+  each label for each arm, and where your file is. The button to start or continue
   annotating appears here once every clip has been generated.
 - **Docs**: how the method works and what to watch for. A contents page
   lists the pages in reading order: how clips are made, four pages on the
@@ -172,12 +192,27 @@ data4annotation/<subject>/
     design.toml             copy of the settings they were drawn with
     clips/seg_0001.mp4 ...  the 1 s clips
     generation_time.json    time spent generating so far, over every run
-    <subject>_<rater>_annotations.csv   one file per rater
+    <subject>_<rater>_annotations.csv                 labels in progress (no date)
+    <subject>_<rater>_annotations_<date-time>.csv     saved labels; same name on the RDM
+    ratings_uploaded.json   what was last uploaded to the shared folder
 ```
 
-The annotation file gets one row each time a clip is labelled: `segment_id`,
-`label`, `rater`, `annotated_at`. If a clip is labelled again, a new row is
-added, and the last row for a clip is the one that counts.
+A label file has exactly one row per clip: `segment_id`, `right_label`,
+`left_label`, `rater`, `annotated_at`. If you change a clip's labels, its
+row is rewritten.
+
+The file name tells you where things stand:
+
+- `Pxx_<rater>_annotations.csv`, with **no date**, is work in progress. It
+  holds changes that have not been saved yet.
+- `Pxx_<rater>_annotations_<date-time>.csv` is a **save**. It is made when
+  every clip is labelled and you reach the finished page, and a copy with
+  the **same name** goes to the RDM. If you later change a label, a new
+  dated file is made at the next save; the earlier one is kept as it was.
+
+To label the same clips again from the start, stop the app and run
+`uv run python reset.py --ratings`. The label files are moved to
+`data4annotation/_archive`, not deleted, and the clips are kept.
 
 `data4annotation/` and `local.toml` are never committed to git.
 
@@ -198,19 +233,23 @@ uv run python reset.py
 It lists what it will do and asks you to type the participant's name before
 doing anything.
 
-- The clips, `segments.csv` and `design.toml` are deleted.
+- The clips, `segments.csv` and `design.toml` are deleted, with the two
+  small notes that go with them (time spent generating, and what was last
+  uploaded).
 - Annotation files are **not** deleted. They are moved to
   `data4annotation/_archive/`, in a folder named with the date and time.
 - What was read from the source videos is kept, so the data summary does
   not have to be read again. Add `--recording` to clear that too.
-- Your rater name is kept. Add `--rater` to be asked for it again.
+- Your rater name is kept. Add `--rater` to be asked for it again; that
+  also forgets the name your ratings were uploaded under.
 - `uv run python reset.py Pxx` resets another participant's folder.
 
 ## Settings
 
 `study.toml` holds the study design: the category labels, the number of
-clips, the clip length, the sampling method and its random seed, the
-timestamp rule, and the clip quality. Every rater must use the same `study.toml`. If it changes after
+clips, the share taken from task video, the clip length, the sampling
+method and its random seed, the timestamp rule, and the clip quality. It
+also names the shared folder on the RDM, which is not part of the design. Every rater must use the same `study.toml`. If it changes after
 clips have been generated, the app stops and says what differs, because old
 and new clips must not be mixed. Run `reset.py` (above) to clear the old ones.
 

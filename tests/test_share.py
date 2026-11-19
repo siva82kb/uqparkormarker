@@ -66,7 +66,7 @@ class TwoComputers(unittest.TestCase):
 
     def label_all(self, rater="ann", label="Non-functional"):
         for row in clipset.read_segments(SUBJECT):
-            annotations.append(SUBJECT, rater, row.segment_id, label)
+            annotations.save(SUBJECT, rater, row.segment_id, {"right": label, "left": label})
 
 
 class Design(unittest.TestCase):
@@ -221,6 +221,79 @@ class Ratings(TwoComputers):
         self.assertEqual(config.load_local()["uploaded_as"], "ann")
         self.assertEqual(shared_ratings.taken_names(self.share, SUBJECT), {"ann"})
 
+    def local_names(self):
+        return sorted(p.name for p in clipset.folder(SUBJECT).glob("*_annotations*.csv"))
+
+    def rdm_names(self):
+        folder = self.share / share.RATINGS
+        return sorted(p.name for p in folder.iterdir()) if folder.is_dir() else []
+
+    def test_saving_gives_the_file_its_date_and_the_same_name_on_the_rdm(self):
+        self.shared_set()
+        self.label_all()
+        self.assertEqual(self.local_names(), ["Pxx_ann_annotations.csv"])       # in progress: no date
+        before = shared_ratings.standing(SUBJECT, "ann")
+        self.assertEqual((before.in_progress, before.saved, before.uploaded), (True, "", False))
+
+        outcome = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(9))
+        name = "Pxx_ann_annotations_20261120-091530.csv"
+        self.assertEqual((outcome.status, outcome.file), ("uploaded", name))
+        self.assertEqual(self.local_names(), [name])                             # the undated file is gone
+        self.assertEqual(self.rdm_names(), [name])
+        self.assertEqual((clipset.folder(SUBJECT) / name).read_bytes(),
+                         (self.share / share.RATINGS / name).read_bytes())       # identical contents
+        after = shared_ratings.standing(SUBJECT, "ann")
+        self.assertEqual((after.in_progress, after.saved, after.saved_at, after.uploaded),
+                         (False, name, self.at(9), True))
+        self.assertEqual(after.current.name, name)
+
+    def test_edit_after_saving_makes_a_second_file_with_one_row_per_clip(self):
+        self.shared_set()
+        self.label_all()
+        shared_ratings.upload(self.share, SUBJECT, "ann", self.at(9))
+        first = "Pxx_ann_annotations_20261120-091530.csv"
+        kept = (clipset.folder(SUBJECT) / first).read_bytes()
+
+        annotations.save(SUBJECT, "ann", "seg_0002", {"right": "Task-related functional", "left": "Non-functional"})
+        self.assertEqual(self.local_names(), [first, "Pxx_ann_annotations.csv"][::-1])   # undated again
+        self.assertTrue(shared_ratings.standing(SUBJECT, "ann").in_progress)
+        self.assertEqual(self.rdm_names(), [first])                              # nothing uploaded yet
+
+        outcome = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(11))
+        second = "Pxx_ann_annotations_20261120-111530.csv"
+        self.assertEqual((outcome.status, outcome.file, outcome.previous), ("uploaded", second, self.at(9)))
+        self.assertEqual(self.local_names(), [first, second])
+        self.assertEqual(self.rdm_names(), [first, second])
+        self.assertEqual((clipset.folder(SUBJECT) / first).read_bytes(), kept)   # the first save is as it was
+        rows = annotations.rows(clipset.folder(SUBJECT) / second)
+        self.assertEqual(len(rows), 4)                                           # one row per clip
+        self.assertEqual({r["segment_id"]: r["right_label"] for r in rows}["seg_0002"], "Task-related functional")
+        self.assertEqual(annotations.read(SUBJECT, "ann")["seg_0002"]["right"], "Task-related functional")
+
+    def test_save_goes_through_without_the_rdm_and_keeps_its_name(self):
+        self.shared_set()
+        self.label_all()
+        gone = self.base / "not connected" / STUDY["share"]["folder"]
+        outcome = shared_ratings.upload(gone, SUBJECT, "ann", self.at(9))
+        name = "Pxx_ann_annotations_20261120-091530.csv"
+        self.assertEqual((outcome.status, outcome.file), ("unreachable", name))
+        self.assertEqual(self.local_names(), [name])                             # saved here all the same
+        self.assertFalse(shared_ratings.standing(SUBJECT, "ann").uploaded)
+        later = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(13))   # the VPN is back
+        self.assertEqual((later.status, later.file), ("uploaded", name))         # the date is the save, not the upload
+        self.assertEqual(self.rdm_names(), [name])
+
+    def test_name_clash_renames_the_saved_file_too(self):
+        self.shared_set()
+        self.label_all()
+        shared_ratings.upload(self.share, SUBJECT, "ann", self.at(9))
+        self.on("second")                                                        # another person, same name
+        self.label_all(label="No activity/movement")
+        outcome = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(10))
+        self.assertRegex(outcome.name, r"^ann_\d{3}$")
+        name = f"Pxx_{outcome.name}_annotations_20261120-101530.csv"
+        self.assertEqual((outcome.file, self.local_names()), (name, [name]))     # same name in both places
+        self.assertIn(name, self.rdm_names())
     def test_nothing_new_is_not_uploaded_again(self):
         self.shared_set()
         self.label_all()
@@ -233,7 +306,7 @@ class Ratings(TwoComputers):
         self.shared_set()
         self.label_all()
         shared_ratings.upload(self.share, SUBJECT, "ann", self.at(9))
-        annotations.append(SUBJECT, "ann", "seg_0001", "No activity/movement")
+        annotations.save(SUBJECT, "ann", "seg_0001", {"right": "Non-functional", "left": "No activity/movement"})
         outcome = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(11))
         self.assertEqual((outcome.status, outcome.previous), ("uploaded", self.at(9)))
         files = shared_ratings.shared(self.share, SUBJECT)
@@ -255,10 +328,10 @@ class Ratings(TwoComputers):
         with uploaded.path.open(newline="", encoding="utf-8") as fh:
             self.assertEqual({row["rater"] for row in csv.DictReader(fh)}, {outcome.name})
         # The file on this computer is left as it was.
-        self.assertEqual(annotations.read(SUBJECT, "ann")["seg_0001"], "No activity/movement")
+        self.assertEqual(annotations.read(SUBJECT, "ann")["seg_0001"]["left"], "No activity/movement")
 
         # Later uploads from this computer keep that name, and count as the same rater.
-        annotations.append(SUBJECT, "ann", "seg_0002", "Non-functional")
+        annotations.save(SUBJECT, "ann", "seg_0002", {"right": "Non-functional", "left": "Non-functional"})
         later = shared_ratings.upload(self.share, SUBJECT, "ann", self.at(12))
         self.assertEqual((later.name, later.renamed, later.previous), (outcome.name, True, self.at(10)))
 

@@ -1,6 +1,6 @@
 """A made-up recording that shows how late timestamps arise.
 
-Used only for the diagrams on the timing pages. It follows the recorder as
+Used only for the diagrams on the docs pages about timestamps. It follows the recorder as
 it is understood (see "Parked problems" in CLAUDE.md):
 
   - The camera films one frame per frame-time and notes the time of its

@@ -192,6 +192,7 @@ the rule, checks it on {{ subject }}, and sets out what it costs.
       <li><strong>The sample is tilted.</strong> Removed seconds cluster where the program was busy, often as a task starts. Behaviour at those moments is under-sampled.</li>
       <li><strong>It removes good frames too.</strong> A repeated timestamp can come from a hold-up of one frame. The rule removes the second around it all the same.</li>
       <li><strong>Not a guarantee.</strong> One participant kept a clip 211 ms late. And the check itself gives the <em>least</em> a timestamp can be late.</li>
+      <li><strong>Missing frames are not caught.</strong> Where the camera delivered fewer than 30 frames a second, a clip still has its full number of frames, so it covers more than {{ clip_seconds }} s of real time and plays back faster than life. In {{ subject }} this is {{ report.share_long_clips | share }} of the allowed clips; the longest covers {{ '%.2f' | format(report.longest_clip) }} s. The clip's two saved timestamps do show its true length.</li>
       <li><strong>Small errors stay.</strong> A timestamp can still be one frame off (about 30 ms), and the fixed delay between filming and stamping is not measured.</li>
     </ul>
   </section>

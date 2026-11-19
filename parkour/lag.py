@@ -1,7 +1,7 @@
 """Measure how late each frame's timestamp is. A measurement only.
 
 Nothing here is used to choose clips or to correct any time. It exists so
-the timing pages can show the size of the problem and check the rule in
+the docs pages on timestamps can show the size of the problem and check the rule in
 `timing.py` against it.
 
 The idea, for one video:

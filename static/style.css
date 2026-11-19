@@ -85,6 +85,13 @@ section { margin-top: 26px; scroll-margin-top: 56px; }   /* clear the fixed head
   gap: 0 36px;
 }
 .pair-even { grid-template-columns: 1fr 1fr; }
+.pair-paths { grid-template-columns: minmax(320px, 5fr) 7fr; }   /* a narrow table, then room for file paths */
+
+/* A table of places and file paths: the place stays on one line, the path
+   is in a fixed-width face and may break anywhere if it is too long. */
+.paths td:first-child { white-space: nowrap; color: var(--ink-soft); }
+.paths th:last-child, .paths td:last-child { text-align: right; }   /* paths line up on the right */
+.paths .path { font-family: ui-monospace, Consolas, monospace; font-size: 0.78em; overflow-wrap: anywhere; }
 
 /* ---- Text ---- */
 
@@ -596,9 +603,9 @@ tbody tr:hover { background: var(--accent-soft); }
 .signin .button { justify-self: start; margin-top: 6px; }
 .field-error { margin: 0; color: var(--uq-purple); font-weight: 500; }
 
-/* ---- Annotation: the clip, then five labels ---- */
+/* ---- Annotation: the clip, with a set of labels for each arm beside it ---- */
 
-.page-annotate { max-width: calc(920px + 2 * var(--gutter)); padding-top: 16px; }
+.page-annotate { max-width: calc(1360px + 2 * var(--gutter)); padding-top: 16px; }
 
 .annotate-head {
   display: flex;
@@ -613,70 +620,111 @@ tbody tr:hover { background: var(--accent-soft); }
 
 .progress-slim { height: 4px; margin: 6px 0 12px; }
 
+/* Three columns: one arm's labels, the clip, the other arm's labels. */
+.annotate {
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) minmax(170px, 220px);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.annotate section { margin: 0; }
+
 .clip {
   display: block;
   width: 100%;
-  max-height: calc(100vh - 290px);     /* keep the labels on screen */
+  max-height: calc(100vh - 230px);     /* keep the buttons under it on screen */
   min-height: 220px;
   aspect-ratio: 16 / 9;
+  align-self: center;
   border-radius: 6px;
   background: #000;
 }
 
-.annotate-note { margin: 10px 0 0; }
-
-.labels {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+.arm {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: border-color 0.1s, background 0.1s;
 }
+
+.arm h2 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.arm h2 .or { color: var(--ink-soft); font-weight: 400; letter-spacing: 0; text-transform: none; }
+.arm-labels { display: grid; gap: 6px; flex: 1; }
+
+/* The arm that number keys go to (chosen with R or L). */
+.arm-active { border-color: var(--uq-purple); background: var(--accent-soft); }
+.arm-active h2 kbd { border-color: var(--uq-purple); background: var(--uq-purple); color: #fff; }
 
 .label {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 10px 12px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   border: 1px solid var(--uq-neutral);
   border-radius: 6px;
   background: var(--surface);
-  color: var(--ink-soft);
-  font: 500 0.9rem/1.25 var(--sans);
+  color: var(--ink);
+  font: 500 0.88rem/1.25 var(--sans);
   text-align: left;
-  user-select: none;                   /* Shift+click must not select text */
-  cursor: not-allowed;                 /* until Shift is held */
+  user-select: none;
+  cursor: pointer;
   transition: border-color 0.1s, background 0.1s, color 0.1s;
 }
 
-.label kbd {
-  min-width: 26px;
-  padding: 2px 7px;
+.label:hover:not(:disabled) { border-color: var(--uq-purple); }
+
+/* Off until the arm is chosen with R or L. The label already given stays
+   clearly marked, so both choices can be read at a glance. */
+.label:disabled { pointer-events: none; }    /* a click falls through to the arm, which says what to do */
+.label:disabled:not(.label-chosen) { color: var(--ink-soft); background: transparent; opacity: 0.6; }
+.arm:not(.arm-active) { cursor: not-allowed; }
+.label:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 2px; }
+
+kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 1px 6px;
   border: 1px solid var(--uq-neutral);
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--ink);
-  font: 600 0.85rem var(--heading);
+  font: 600 0.82rem var(--heading);
+  letter-spacing: 0;
   text-align: center;
+  text-transform: none;
 }
 
-.label-current { border-color: var(--uq-purple); box-shadow: inset 0 0 0 1px var(--uq-purple); color: var(--ink); }
-.label:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 2px; }
+/* The label this arm has been given. */
+.label-chosen { border-color: var(--uq-purple); background: var(--uq-purple); color: #fff; }
+.label-chosen kbd { border-color: #fff; background: transparent; color: #fff; }
 
-/* Shift is down: the labels are live. */
-.armed .label { border-color: var(--uq-purple); color: var(--ink); cursor: pointer; }
-.armed .label kbd { border-color: var(--uq-purple); background: var(--uq-purple); color: #fff; }
-.armed .label:hover { background: var(--accent-soft); }
-
-.annotate-hint { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.9rem; min-height: 1.45em; }
-.armed .annotate-hint, .annotate-hint.refused { color: var(--uq-purple); font-weight: 500; }
-
-@media (max-width: 760px) {
-  .labels { grid-template-columns: 1fr; }
-  .label { flex-direction: row; align-items: center; }
-  .clip { max-height: none; }
+.annotate-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
 }
 
+.annotate-nav .button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.annotate-nav .button kbd { border-color: currentColor; background: transparent; color: inherit; }
+.button-off { opacity: 0.4; }
+.button-busy { opacity: 0.6; cursor: progress; }   /* pressed; the next page is on its way */
+a.button-off:not([href]) { cursor: default; }
+
+.annotate-hint { margin: 0; color: var(--ink-soft); font-size: 0.9rem; text-align: center; min-height: 1.45em; }
+.annotate-hint.refused { color: var(--uq-purple); font-weight: 500; }
+.annotate-note { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.85rem; text-align: center; }
+
+@media (max-width: 900px) {
+  /* The clip on top, the two arms side by side under it, in the same order. */
+  .annotate { grid-template-columns: 1fr 1fr; }
+  .annotate .clip { grid-column: 1 / -1; grid-row: 1; max-height: none; }
+}
 /* ---- Timing pages: reading text beside wide figures ---- */
 
 h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
@@ -723,10 +771,11 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 .contents-link:hover { text-decoration: underline; }
 .contents-about { color: var(--ink-soft); }
 
-/* One reading width for a docs page: text, boxes, lists and simple tables
-   all end at the same right edge. Only charts, diagrams and side-by-side
-   layouts (.pair, .table-scroll) use the full width. */
+/* One width for a docs page: text, boxes, lists, tables, diagrams and charts
+   all run the full width of the column, so every block ends at the same
+   right edge. Other reading pages keep the narrower measure. */
 :root { --measure: 720px; }
+.doc-main { --measure: 100%; }
 .prose { max-width: var(--measure); }
 .doc-main section > table,
 .doc-main section > pre,
