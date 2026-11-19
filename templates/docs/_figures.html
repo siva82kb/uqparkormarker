@@ -1,0 +1,273 @@
+{# Diagrams and charts for the timing pages, drawn as plain SVG and HTML.
+   Orange always means a late timestamp or a removed frame. #}
+
+{# ---- How the recorder saves a frame and its time ---- #}
+{% macro recorder() %}
+<svg class="diagram" viewBox="0 0 1000 250" role="img"
+     aria-label="The camera thread reads frames and notes the time of the latest one in a single shared place. Frames wait in a queue. The main thread saves each frame when it is free, with whatever time is in the shared place at that moment.">
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6a6561"/>
+    </marker>
+    <marker id="tip-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#51247a"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="10" y="30" width="130" height="70" rx="4"/>
+  <text class="t-strong" x="75" y="62" text-anchor="middle">Camera</text>
+  <text class="t-small" x="75" y="80" text-anchor="middle">30 frames a second</text>
+
+  <rect class="box" x="210" y="30" width="200" height="70" rx="4"/>
+  <text class="t-strong" x="310" y="62" text-anchor="middle">Camera thread</text>
+  <text class="t-small" x="310" y="80" text-anchor="middle">reads each frame as it arrives</text>
+
+  <rect class="box" x="480" y="30" width="170" height="70" rx="4"/>
+  {% for k in range(5) %}
+  <rect class="mark" x="{{ 497 + k * 28 }}" y="40" width="22" height="16" rx="2"/>
+  {% endfor %}
+  <text class="t-strong" x="565" y="77" text-anchor="middle">Frames waiting</text>
+  <text class="t-small" x="565" y="92" text-anchor="middle">usually none or one</text>
+
+  <rect class="box" x="720" y="30" width="270" height="70" rx="4"/>
+  <text class="t-strong" x="855" y="56" text-anchor="middle">Main thread</text>
+  <text class="t-small" x="855" y="74" text-anchor="middle">saves the next frame when it is free,</text>
+  <text class="t-small" x="855" y="89" text-anchor="middle">and saves a time next to it</text>
+
+  <path class="arrow" d="M140,65 H206" marker-end="url(#tip)"/>
+  <path class="arrow" d="M410,65 H476" marker-end="url(#tip)"/>
+  <path class="arrow" d="M650,65 H716" marker-end="url(#tip)"/>
+
+  <rect class="box-accent" x="400" y="170" width="330" height="62" rx="4"/>
+  <text class="t-strong" x="565" y="196" text-anchor="middle">One shared time</text>
+  <text class="t-small" x="565" y="214" text-anchor="middle">holds the time of the latest frame read, nothing older</text>
+
+  <path class="arrow-accent" d="M310,100 V201 H396" marker-end="url(#tip-accent)"/>
+  <text class="t-small" x="300" y="150" text-anchor="end">overwritten at</text>
+  <text class="t-small" x="300" y="165" text-anchor="end">every frame read</text>
+
+  <path class="arrow-accent" d="M730,201 H855 V104" marker-end="url(#tip-accent)"/>
+  <text class="t-small" x="866" y="150">copied at the moment</text>
+  <text class="t-small" x="866" y="165">a frame is saved</text>
+</svg>
+{% endmacro %}
+
+
+{# ---- A made-up recording: when frames were filmed, and the timestamps saved ---- #}
+{% macro late_sketch(s) %}
+{% set x0 = 150 %}
+{% set dx = 830 / (s.late | length) %}
+{% set stamps = s.stamps %}
+{% set repeats = s.repeats %}
+{% set gap_from = stamps[s.busy_at - 1] %}
+{% set gap_to = stamps[s.busy_at] %}
+<svg class="diagram" viewBox="0 0 1000 232" role="img"
+     aria-label="Two rows of dots. The top row shows frames filmed at even spacing. The bottom row shows the timestamps saved with them. Where the writer was held up there is a gap in the timestamps, then the waiting frames get bunched, late timestamps, some of them repeated, until the writer has caught up.">
+  <text class="t-strong" x="10" y="44">Filmed</text>
+  <text class="t-small" x="10" y="60">when it happened</text>
+  <text class="t-strong" x="10" y="136">Timestamp</text>
+  <text class="t-small" x="10" y="152">what was saved</text>
+
+  {% for i in range(stamps | length) %}
+  {% set late = s.late[i] > 0 %}
+  <line class="{{ 'link-late' if late else 'link' }}"
+        x1="{{ '%.1f' | format(x0 + i * dx) }}" y1="48"
+        x2="{{ '%.1f' | format(x0 + stamps[i] * dx) }}" y2="{{ 140 if repeats[i] else 128 }}"/>
+  {% endfor %}
+  {% for i in range(stamps | length) %}
+  {% set late = s.late[i] > 0 %}
+  <circle class="{{ 'mark-late' if late else 'mark' }}" cx="{{ '%.1f' | format(x0 + i * dx) }}" cy="42" r="4.5"/>
+  <circle class="{{ 'mark-late' if late else 'mark' }}" cx="{{ '%.1f' | format(x0 + stamps[i] * dx) }}"
+          cy="{{ 146 if repeats[i] else 134 }}" r="4.5"/>
+  {% endfor %}
+
+  {# The three parts of a late stretch, marked under the timestamps #}
+  {% set a = x0 + gap_from * dx + 7 %}
+  {% set b = x0 + gap_to * dx - 7 %}
+  {% set c = x0 + (s.caught_up_at - 1) * dx + 7 %}
+  <path class="bracket" d="M{{ '%.1f' | format(a) }},166 v6 H{{ '%.1f' | format(b) }} v-6"/>
+  <text class="t-strong" x="{{ '%.1f' | format(a) }}" y="192">1. Gap</text>
+  <text class="t-small" x="{{ '%.1f' | format(a) }}" y="208">no timestamps: the</text>
+  <text class="t-small" x="{{ '%.1f' | format(a) }}" y="223">writer was held up</text>
+
+  <path class="bracket-late" d="M{{ '%.1f' | format(b + 14) }},166 v6 H{{ '%.1f' | format(c) }} v-6"/>
+  <text class="t-strong" x="{{ '%.1f' | format(b + 14) }}" y="192">2. Catch-up</text>
+  <text class="t-small" x="{{ '%.1f' | format(b + 14) }}" y="208">timestamps bunched and late;</text>
+  <text class="t-small" x="{{ '%.1f' | format(b + 14) }}" y="223">every third one repeats (lower dot)</text>
+
+  <text class="t-strong" x="{{ '%.1f' | format(c + 16) }}" y="192">3. Back to normal</text>
+  <text class="t-small" x="{{ '%.1f' | format(c + 16) }}" y="208">the queue is empty</text>
+
+</svg>
+{% endmacro %}
+
+
+{# ---- The rule tried on a made-up recording ---- #}
+{% macro rule_sketch(e) %}
+{% set s = e.sketch %}
+{% set x0 = 20 %}
+{% set dx = 960 / (s.late | length) %}
+{% set stamps = s.stamps %}
+{% set repeats = s.repeats %}
+<svg class="diagram" viewBox="0 0 1000 214" role="img"
+     aria-label="A row of timestamps with one gap followed by repeated timestamps. Four clips are tried on it. The two that contain the gap or a repeated timestamp are removed. The two that contain neither are kept.">
+  {# Example clips, each a bracket over the timestamps of its frames #}
+  {% for clip in e.clips %}
+  {% set y = 34 if loop.index is odd else 76 %}
+  {% set a = x0 + stamps[clip.first] * dx %}
+  {% set b = x0 + stamps[clip.last] * dx %}
+  <path class="{{ 'bracket-kept' if clip.kept else 'bracket-late' }}"
+        d="M{{ '%.1f' | format(a) }},{{ y + 12 }} v-6 H{{ '%.1f' | format(b) }} v6"/>
+  <text class="t-strong" x="{{ '%.1f' | format(a) }}" y="{{ y - 14 }}">{{ 'Kept' if clip.kept else 'Removed' }}</text>
+  <text class="t-small" x="{{ '%.1f' | format(a) }}" y="{{ y }}">{{ clip.reason }}</text>
+  {% endfor %}
+
+  {# Frames no allowed clip can contain #}
+  {% for first, last in e.removed_runs %}
+  {% set a = x0 + stamps[first - 1 if first else 0] * dx %}
+  {% set b = x0 + stamps[last] * dx %}
+  <rect class="wash-late" x="{{ '%.1f' | format(a) }}" y="104" width="{{ '%.1f' | format(b - a) }}" height="46"/>
+  <text class="t-small t-late" x="{{ '%.1f' | format(a) }}" y="170">No clip is ever cut from here</text>
+  {% endfor %}
+
+  {# One tick per frame, placed at its timestamp; a repeated timestamp is drawn taller #}
+  {% for i in range(stamps | length) %}
+  {% set x = x0 + stamps[i] * dx %}
+  {% if repeats[i] %}
+  <rect class="mark-late" x="{{ '%.1f' | format(x - 1.5) }}" y="108" width="3" height="38"/>
+  {% else %}
+  <rect class="{{ 'mark-late' if s.late[i] > 0 else 'mark' }}" x="{{ '%.1f' | format(x - 1) }}" y="118" width="2" height="18"/>
+  {% endif %}
+  {% endfor %}
+
+  <line class="rule" x1="{{ x0 }}" y1="186" x2="980" y2="186"/>
+  {% for second in range(5) %}
+  {% set x = x0 + second * s.frame_rate * dx %}
+  {% if x <= 980 %}
+  <line class="rule" x1="{{ '%.1f' | format(x) }}" y1="186" x2="{{ '%.1f' | format(x) }}" y2="191"/>
+  <text class="t-small t-num" x="{{ '%.1f' | format(x) }}" y="206" text-anchor="{{ 'start' if second == 0 else 'middle' }}">{{ second }} s</text>
+  {% endif %}
+  {% endfor %}
+</svg>
+{% endmacro %}
+
+
+{# ---- Close-up of the worst late stretch in the real recording ---- #}
+{% macro stretch_chart(st, show_removed=false) %}
+{% set L, R = 56, 986 %}
+{% set a_top, a_bot, b_top, b_bot = 34, 190, 250, 330 %}
+{% set half = (R - L) / ((st.frames | length - 1) or 1) / 2 %}
+<svg class="diagram" viewBox="0 0 1000 372" role="img"
+     aria-label="Two charts over the same frames. The upper one shows how late each timestamp is. The lower one shows the step from each frame's timestamp to the next. The numbers are also given in the text.">
+  {% if show_removed %}
+  {% for first, last in st.removed_runs %}
+  {% set x = st.frame_axis.at(first, L, R) - half %}
+  <rect class="wash-late" x="{{ [x, L - half] | max }}" y="{{ a_top }}"
+        width="{{ st.frame_axis.at(last, L, R) + half - x }}" height="{{ b_bot - a_top }}"/>
+  {% endfor %}
+  {% endif %}
+
+  <text class="t-strong" x="0" y="14">How late each timestamp is, at least (ms)</text>
+  {% for tick in st.lag_axis.ticks %}
+  {% set y = st.lag_axis.at(tick, a_bot, a_top) %}
+  <line class="{{ 'rule' if tick == 0 else 'grid' }}" x1="{{ L - half }}" y1="{{ y }}" x2="{{ R + half }}" y2="{{ y }}"/>
+  <text class="t-small t-num" x="{{ L - half - 8 }}" y="{{ y + 4 }}" text-anchor="end">{{ '%g' | format(tick) }}</text>
+  {% endfor %}
+  <polyline class="series" points="{% for f in st.frames %}{{ st.frame_axis.at(f.number, L, R) }},{{ st.lag_axis.at(f.lag_ms, a_bot, a_top) }} {% endfor %}"/>
+
+  <text class="t-strong" x="0" y="{{ b_top - 20 }}">Step from the previous frame's timestamp (ms)</text>
+  {% for tick in st.step_axis.ticks %}
+  {% set y = st.step_axis.at(tick, b_bot, b_top) %}
+  <line class="{{ 'rule' if tick == 0 else 'grid' }}" x1="{{ L - half }}" y1="{{ y }}" x2="{{ R + half }}" y2="{{ y }}"/>
+  <text class="t-small t-num" x="{{ L - half - 8 }}" y="{{ y + 4 }}" text-anchor="end">{{ '%g' | format(tick) }}</text>
+  {% endfor %}
+  {% for f in st.frames if f.step_ms is not none %}
+  <circle class="{{ 'mark-late' if f.repeat or f.pause else 'mark' }}" r="{{ 4 if f.repeat or f.pause else 2.5 }}"
+          cx="{{ st.frame_axis.at(f.number, L, R) }}" cy="{{ st.step_axis.at(f.step_ms, b_bot, b_top) }}"/>
+  {% endfor %}
+
+  {% for tick in st.frame_axis.ticks %}
+  <text class="t-small t-num" x="{{ st.frame_axis.at(tick, L, R) }}" y="{{ b_bot + 18 }}" text-anchor="middle">{{ tick | int }}</text>
+  {% endfor %}
+  <text class="t-small" x="{{ (L + R) / 2 }}" y="{{ b_bot + 38 }}" text-anchor="middle">Frame number in the video</text>
+
+  {% for f in st.frames %}
+  <rect class="hit" x="{{ st.frame_axis.at(f.number, L, R) - half }}" y="{{ a_top }}" width="{{ 2 * half }}" height="{{ b_bot - a_top }}"
+        data-tip="Frame {{ f.number }} · at least {{ '%.0f' | format(f.lag_ms) }} ms late{% if f.step_ms is not none %} · step {{ '%.0f' | format(f.step_ms) }} ms{% endif %}{% if f.repeat %} (repeated timestamp){% elif f.pause %} (gap){% endif %}{% if show_removed %} · {{ 'removed' if f.removed else 'kept' }}{% endif %}"/>
+  {% endfor %}
+</svg>
+<p class="readout" data-idle="Point at the chart to read one frame.">Point at the chart to read one frame.</p>
+{% endmacro %}
+
+
+{# ---- The whole session: worst lag, removed frames, and the videos ---- #}
+{% macro session_chart(r) %}
+<div class="session-plot" role="img"
+     aria-label="Columns showing the largest lag in each slice of the session. The numbers are also given in the text and table.">
+  {% for tick in r.column_axis.ticks if tick > 0 %}
+  <div class="session-grid" style="bottom: {{ r.column_axis.at(tick, 0, 100) }}%"><span>{{ '%g' | format(tick) }} ms</span></div>
+  {% endfor %}
+  {% for c in r.columns %}
+  <span class="session-col" style="left: {{ '%.3f' | format(c.left) }}%; width: {{ '%.3f' | format(c.width) }}%"
+        data-tip="Around {{ c.clock }} · largest lag at least {{ '%.0f' | format(c.lag_ms) }} ms"><i style="height: {{ r.column_axis.at(c.lag_ms, 0, 100) }}%"></i></span>
+  {% endfor %}
+</div>
+<p class="strip-label">Frames removed by the rule</p>
+<div class="strip" aria-hidden="true">
+  {% for left, width in r.removed_spans %}
+  <span class="span span-late" style="left: {{ '%.4f' | format(left) }}%; width: {{ '%.4f' | format(width) }}%"></span>
+  {% endfor %}
+</div>
+<p class="strip-label">Task video (purple) and unlabelled video (grey)</p>
+<div class="timeline thin" aria-hidden="true">
+  {% for span in r.timeline %}
+  <span class="span span-{{ span.kind }}" style="left: {{ '%.4f' | format(span.left) }}%; width: {{ '%.4f' | format(span.width) }}%"></span>
+  {% endfor %}
+</div>
+<div class="timeline-axis" aria-hidden="true">
+  {% for label, left in r.ticks %}
+  <span class="tick" style="left: {{ '%.4f' | format(left) }}%">{{ label }}</span>
+  {% endfor %}
+</div>
+<p class="readout" data-idle="Point at the columns to read the time and the lag.">Point at the columns to read the time and the lag.</p>
+{% endmacro %}
+
+
+{# ---- Shares of frames by how late they are ---- #}
+{% macro band_bars(bands, late=false) %}
+<div class="bands">
+  {% for b in bands %}
+  <span>{{ b.label }}</span>
+  <span class="band-track"><i class="band-fill {{ 'late' if late }} {{ 'empty' if not b.count }}" style="width: {{ '%.2f' | format(100 * b.share) }}%"></i></span>
+  <span class="band-value">{{ b.share | share }}</span>
+  <span class="dim">{{ '{:,}'.format(b.count) }}</span>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{# ---- Two clocks and the jumps that tie them together ---- #}
+{% macro clocks() %}
+<svg class="diagram" viewBox="0 0 1000 190" role="img"
+     aria-label="Two time lines, one for the video computer's clock and one for a sensor's clock. A jump landing at the start of the session and one at the end are seen on both. The difference between the two clocks at the start is the offset. How much that difference has changed by the end is the drift.">
+  <text class="t-strong" x="0" y="54">Video computer's clock</text>
+  <text class="t-strong" x="0" y="134">A sensor's clock</text>
+  <line class="rule" x1="190" y1="50" x2="990" y2="50"/>
+  <line class="rule" x1="190" y1="130" x2="990" y2="130"/>
+
+  <line class="link-late" x1="270" y1="50" x2="300" y2="130"/>
+  <line class="link-late" x1="880" y1="50" x2="940" y2="130"/>
+  {% for x, y in [(270, 50), (300, 130), (880, 50), (940, 130)] %}
+  <circle class="mark-late" cx="{{ x }}" cy="{{ y }}" r="5"/>
+  {% endfor %}
+
+  <text class="t-strong" x="270" y="24" text-anchor="middle">Jump landing, start of session</text>
+  <text class="t-strong" x="880" y="24" text-anchor="middle">Jump landing, end of session</text>
+  <text class="t-small" x="312" y="94">offset at the start</text>
+  <text class="t-small" x="800" y="94" text-anchor="end">a larger offset at the end:</text>
+  <text class="t-small" x="800" y="109" text-anchor="end">the change is the drift</text>
+
+  <path class="bracket" d="M330,150 v6 H850 v-6"/>
+  <text class="t-small" x="590" y="176" text-anchor="middle">every clip in between is placed on the sensor's clock using the offset and the drift</text>
+</svg>
+{% endmacro %}

@@ -9,6 +9,13 @@
 <body>
   <header class="site-header">
     <a class="brand" href="{{ url_for('home') }}">UQ Parkour Annotator</a>
+    <nav class="site-nav" aria-label="Sections">
+      {% set here = request.endpoint or '' %}
+      <a href="{{ url_for('summary_page') }}" {% if here == 'summary_page' %}aria-current="page"{% endif %}>Data summary</a>
+      <a href="{{ url_for('annotation_summary') }}" {% if here == 'annotation_summary' %}aria-current="page"{% endif %}>Annotation summary</a>
+      <a href="{{ url_for('docs_index') }}" {% if here.startswith('docs') %}aria-current="page"{% endif %}>Docs</a>
+    </nav>
+    {% if rater %}<span class="site-who">{{ rater }}{% if open_subject %} · {{ open_subject }}{% endif %}</span>{% endif %}
   </header>
   <main class="page {% block page_class %}{% endblock %}">
     {% block content %}{% endblock %}

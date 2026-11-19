@@ -1,0 +1,154 @@
+{% extends "docs/base.html" %}
+{% import "docs/_figures.html" as figures %}
+{% block heading %}Some timestamps are late{% endblock %}
+{% block lead %}
+Every frame of a video is saved with a time. The clips are to be lined up
+with the sensor data using those times, so they have to be right. Some are
+not. This page shows why.
+{% endblock %}
+
+{% block body %}
+<section class="prose">
+  <h2>What should happen, and what does</h2>
+  <p>Each frame should be saved with the time it was <strong>filmed</strong>.</p>
+  <p>
+    The recording program does not quite do that. It saves the time at which
+    it <strong>got round to saving</strong> the frame.
+  </p>
+  <p>
+    Most of the time the two are the same to within a few hundredths of a
+    second. But now and then the program is held up, for a moment or for
+    several seconds. Then the two come apart.
+  </p>
+</section>
+
+<section>
+  <h2>How the recording program works</h2>
+  <figure class="fig">
+    <span class="fig-source">Diagram</span>
+    {{ figures.recorder() }}
+    <figcaption>
+      The program has two parts that run side by side. One reads frames from
+      the camera. The other saves them to disk. They share <strong>one</strong>
+      place for the time, and it only ever holds the time of the latest frame
+      read.
+    </figcaption>
+  </figure>
+  <div class="prose">
+    <div class="example">
+      <p><strong>An everyday picture.</strong> A wall clock and a pile of letters.</p>
+      <p>
+        Letters arrive one every minute. A clerk stamps each letter with the
+        time on the wall clock and files it. If the clerk steps out for ten
+        minutes, ten letters pile up. Back at the desk, the clerk stamps them
+        all quickly, with the time on the clock <em>now</em>. The first letter
+        in the pile gets a time ten minutes late. Two letters stamped within
+        the same minute get the same time.
+      </p>
+    </div>
+    <p>
+      So a timestamp is <strong>never early</strong>. It can be late, by as
+      much as the time the frame waited.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>What a late stretch looks like</h2>
+  <figure class="fig">
+    <span class="fig-source">Made-up example</span>
+    <ul class="legend">
+      <li><span class="swatch swatch-kept"></span>Timestamp is right</li>
+      <li><span class="swatch swatch-late"></span>Timestamp is late</li>
+    </ul>
+    {{ figures.late_sketch(sketch) }}
+    <figcaption>
+      {{ sketch.late | length }} frames, filmed at an even pace (top row). The
+      program is held up for {{ sketch.busy_frames }} frames' worth of time.
+      Each line joins a frame to the timestamp saved with it. A line that
+      leans to the right is a late timestamp.
+    </figcaption>
+  </figure>
+  <div class="prose">
+    <p>A late stretch always has the same three parts.</p>
+    <ol>
+      <li>
+        <strong>A gap.</strong> Two neighbouring frames whose timestamps are
+        far apart, for example 3 seconds instead of 1/30 of a second. This is
+        when the program was held up.
+      </li>
+      <li>
+        <strong>A catch-up.</strong> The waiting frames are saved in a rush.
+        Their timestamps are bunched together and late. The program saves
+        faster than the camera films, so now and then two frames in a row get
+        exactly the same timestamp.
+      </li>
+      <li>
+        <strong>Back to normal.</strong> Once no frames are waiting, the
+        timestamps are right again.
+      </li>
+    </ol>
+    <p>
+      The pictures themselves are fine throughout. Only the saved times are
+      wrong.
+    </p>
+  </div>
+</section>
+
+<div class="pair pair-even">
+  <section class="prose">
+    <h2>Why it matters</h2>
+    <p>
+      A clip is {{ clip_seconds }} s long. Arm movements change within a fraction of a
+      second. If a clip's time is wrong by a second or more, it will be
+      matched to the wrong piece of sensor data, and nothing in the result
+      will show that it happened.
+    </p>
+    <p>
+      In five of the six participants checked, the worst timestamps were
+      between 2 and 11 seconds late.
+    </p>
+  </section>
+
+  <section class="prose">
+    <h2>A second, smaller problem</h2>
+    <p>
+      One idea is to ignore the timestamps and count frames instead: frame
+      900 is 30 seconds in, at 30 frames a second.
+    </p>
+    <p>
+      That does not work over long stretches. In every session there are a
+      few seconds for which <strong>no frames exist at all</strong> (between
+      0.6 and 17.7 s per session). Counting frames from the start would drift
+      by those seconds. So the timestamps are still needed. They only have to
+      be used with care.
+    </p>
+  </section>
+</div>
+
+<section class="prose">
+  <h2>What is known and what is assumed</h2>
+  <ul>
+    <li>
+      <strong>Known.</strong> The published recording program saves times in
+      the way shown above. The gap, catch-up and repeated timestamps are seen
+      in the recordings of all six participants checked.
+    </li>
+    <li>
+      <strong>Known.</strong> Test recordings from 2022 made at 10 frames a
+      second show almost none of this. At 30 frames a second the program has
+      a third of the time for each frame, so it falls behind more easily.
+    </li>
+    <li>
+      <strong>Assumed.</strong> The study used a changed version of the
+      program, at 30 frames a second. It has not been confirmed that this
+      version saves times in the same way.
+    </li>
+    <li>
+      <strong>Not known.</strong> Why some sessions have hold-ups of many
+      seconds. The frame rate explains the scattered repeated timestamps, but
+      not these.
+    </li>
+  </ul>
+</section>
+{% endblock %}

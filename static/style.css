@@ -107,7 +107,7 @@ h2, .eyebrow, .figure-label, th {
   text-transform: uppercase;
 }
 
-h2 { margin: 0 0 8px; }
+h2 { margin: 0 0 8px; scroll-margin-top: 64px; }   /* clear the fixed header */
 .eyebrow { margin: 0 0 4px; color: var(--accent); }
 .lead { margin: 0; color: var(--ink-soft); font-size: 1.1rem; }
 .note { margin: 0; color: var(--ink-soft); }
@@ -317,6 +317,25 @@ tbody tr:hover { background: var(--accent-soft); }
 .link { color: var(--uq-purple); }
 .actions { margin: 26px 0 0; }
 
+.read-note {                /* when the summary was read, and the way to read again */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--uq-purple);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ---- Progress ---- */
 
 .progress {
@@ -344,6 +363,131 @@ tbody tr:hover { background: var(--accent-soft); }
   min-height: 1.45em;
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---- Signs of life beside the status text ---- */
+
+.pulse {                         /* a small dot that breathes while work goes on */
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--uq-purple);
+  vertical-align: 1px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.pulse[hidden] { display: none; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(0.7); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse { animation: none; }    /* the ticking seconds still show progress */
+}
+
+.progress-seconds { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.progress-time {                 /* thin text beside the "Progress" heading */
+  margin-left: 6px;
+  color: var(--ink-soft);
+  font: 400 0.85rem var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- List of clips: number and start time, in several columns ---- */
+
+.clip-check { margin: 0 0 10px; }
+
+.clip-list {
+  columns: 150px 6;              /* as many columns as fit, six at most */
+  column-gap: 28px;
+  column-rule: 1px solid var(--line);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clip-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  break-inside: avoid;
+}
+
+.clip-number { color: var(--ink-soft); }
+
+/* ---- Mix of clips: task video against unlabelled video ---- */
+
+/* The row under the progress bar: status text on the left, and the mix at
+   the right edge, about a quarter of the progress bar's width. */
+.progress-below {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 40px;
+  margin-top: 8px;
+}
+
+.progress-below .progress-message { margin-top: 0; }
+.progress-text { flex: 1 1 0; min-width: 0; }
+.mix { flex: 0 0 25%; min-width: 220px; }
+
+.mix-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mix-labels > span { display: inline-flex; align-items: baseline; gap: 6px; }
+.mix-labels .swatch { align-self: center; opacity: 0.6; }
+.mix-labels strong { color: var(--ink); font-weight: 600; }
+
+/* Kept quieter than the progress bar above it: thinner, and paler. The
+   progress bar says how far the job has got; this only describes the clips. */
+.mix-bar { position: relative; margin-bottom: 24px; }   /* room for the mark's caption */
+
+.mix-track {
+  display: flex;
+  gap: 2px;                      /* a sliver of page between the two parts */
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);       /* shows only before the first clip is cut */
+  overflow: hidden;
+}
+
+.mix-part { min-width: 2px; opacity: 0.6; transition: flex-grow 0.4s ease; }
+
+.mix-target {                    /* a thin mark at the planned split */
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--ink-soft);
+  transition: left 0.4s ease;
+}
+
+.mix-target span {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .progress-error {
@@ -377,29 +521,162 @@ tbody tr:hover { background: var(--accent-soft); }
 }
 .site-nav a:hover, .site-nav a[aria-current] { opacity: 1; text-decoration: underline; text-underline-offset: 4px; }
 
+.site-who {              /* who is signed in, at the right of the title bar */
+  margin-left: auto;
+  color: #fff;
+  opacity: 0.8;
+  font: 500 0.8rem var(--heading);
+}
+
+/* ---- Sign in ---- */
+
+.signin {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+  margin: 26px 0 18px;
+}
+
+.signin label { font: 600 0.72rem var(--heading); letter-spacing: 0.1em; text-transform: uppercase; }
+
+.signin input {
+  padding: 10px 12px;
+  border: 1px solid var(--uq-grey);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.signin input:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 1px; border-color: var(--uq-purple); }
+.signin .button { justify-self: start; margin-top: 6px; }
+.field-error { margin: 0; color: var(--uq-purple); font-weight: 500; }
+
+/* ---- Annotation: the clip, then five labels ---- */
+
+.page-annotate { max-width: calc(920px + 2 * var(--gutter)); padding-top: 16px; }
+
+.annotate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.annotate-head .eyebrow { margin: 0; }
+.annotate-count { margin: 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.annotate-count strong { color: var(--ink); }
+
+.progress-slim { height: 4px; margin: 6px 0 12px; }
+
+.clip {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 290px);     /* keep the labels on screen */
+  min-height: 220px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
+  background: #000;
+}
+
+.annotate-note { margin: 10px 0 0; }
+
+.labels {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--uq-neutral);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: 500 0.9rem/1.25 var(--sans);
+  text-align: left;
+  user-select: none;                   /* Shift+click must not select text */
+  cursor: not-allowed;                 /* until Shift is held */
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+}
+
+.label kbd {
+  min-width: 26px;
+  padding: 2px 7px;
+  border: 1px solid var(--uq-neutral);
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font: 600 0.85rem var(--heading);
+  text-align: center;
+}
+
+.label-current { border-color: var(--uq-purple); box-shadow: inset 0 0 0 1px var(--uq-purple); color: var(--ink); }
+.label:focus-visible { outline: 2px solid var(--uq-purple); outline-offset: 2px; }
+
+/* Shift is down: the labels are live. */
+.armed .label { border-color: var(--uq-purple); color: var(--ink); cursor: pointer; }
+.armed .label kbd { border-color: var(--uq-purple); background: var(--uq-purple); color: #fff; }
+.armed .label:hover { background: var(--accent-soft); }
+
+.annotate-hint { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.9rem; min-height: 1.45em; }
+.armed .annotate-hint, .annotate-hint.refused { color: var(--uq-purple); font-weight: 500; }
+
+@media (max-width: 760px) {
+  .labels { grid-template-columns: 1fr; }
+  .label { flex-direction: row; align-items: center; }
+  .clip { max-height: none; }
+}
+
 /* ---- Timing pages: reading text beside wide figures ---- */
 
 h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 26px;
-  margin-top: 16px;
-  border-bottom: 1px solid var(--line);
-}
+/* A docs page: its sections in a column on the left, the text on the right. */
+.doc { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 0 44px; }
 
-.steps a {
-  padding: 8px 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
+.doc-side {
+  position: sticky;             /* stays in view while the page scrolls */
+  top: 68px;
+  align-self: start;
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
+  font-size: 0.86rem;
+}
+.doc-up { color: var(--uq-purple); font: 600 0.8rem var(--heading); text-decoration: none; }
+.doc-up:hover { text-decoration: underline; }
+.doc-side-head { margin: 22px 0 6px; color: var(--ink-soft); font: 600 0.68rem var(--heading); letter-spacing: 0.1em; text-transform: uppercase; }
+#doc-sections a {
+  display: block;
+  padding: 4px 0 4px 12px;
+  border-left: 2px solid var(--line);
   color: var(--ink-soft);
-  font: 600 0.8rem var(--heading);
   text-decoration: none;
 }
-.steps a:hover { color: var(--ink); }
-.steps a[aria-current] { color: var(--uq-purple); border-bottom-color: var(--uq-purple); }
-.steps .step-number { margin-right: 6px; font-weight: 500; opacity: 0.7; }
+#doc-sections a:hover { color: var(--ink); }
+#doc-sections a.here { border-left-color: var(--uq-purple); color: var(--uq-purple); font-weight: 500; }
+
+/* Previous and next page, at the top and the bottom of a docs page. */
+.pager { display: flex; justify-content: space-between; gap: 16px; }
+.pager-top { margin-bottom: 22px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.pager-bottom { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pager-link { display: flex; flex-direction: column; gap: 1px; max-width: 48%; text-decoration: none; }
+.pager-next { margin-left: auto; text-align: right; }
+.pager-way { color: var(--ink-soft); font: 600 0.68rem var(--heading); letter-spacing: 0.1em; text-transform: uppercase; }
+.pager-title { color: var(--uq-purple); font: 600 0.9rem var(--heading); }
+.pager-link:hover .pager-title { text-decoration: underline; }
+
+/* The docs contents page. */
+.contents { margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.contents li { display: grid; grid-template-columns: 28px 1fr; gap: 0 4px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.contents-number { grid-row: span 2; color: var(--ink-soft); font: 500 0.95rem var(--heading); }
+.contents-link { color: var(--uq-purple); font: 600 1rem var(--heading); text-decoration: none; }
+.contents-link:hover { text-decoration: underline; }
+.contents-about { color: var(--ink-soft); }
 
 .prose { max-width: 680px; }
 .prose p, .prose ul, .prose ol { margin: 0 0 10px; font-size: 1.02rem; line-height: 1.55; }
@@ -416,6 +693,7 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 
 .fig { margin: 16px 0 0; }
 .fig figcaption { max-width: 680px; margin-top: 8px; color: var(--ink-soft); font-size: 0.9rem; }
+.fig + .prose { margin-top: 14px; }
 .fig figcaption strong { color: var(--ink); font-weight: 600; }
 .fig-source {                   /* says whether a picture is made up or measured */
   display: inline-block;
@@ -430,7 +708,6 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 }
 .fig-source.measured { border-color: var(--uq-purple); color: var(--uq-purple); }
 
-.pager { display: flex; justify-content: space-between; gap: 16px; margin-top: 34px; }
 
 /* ---- Diagrams and charts (SVG) ---- */
 
@@ -472,9 +749,9 @@ h1.title { font-size: clamp(1.9rem, 3.4vw, 2.6rem); letter-spacing: -0.02em; }
 
 /* ---- Whole-session chart (HTML, shares the timeline's positions) ---- */
 
-.session-plot { position: relative; height: 150px; margin-top: 6px; border-bottom: 1px solid var(--uq-grey); }
+.session-plot { position: relative; height: 150px; margin-top: 22px; border-bottom: 1px solid var(--uq-grey); }
 .session-grid { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
-.session-grid span { position: absolute; left: 0; bottom: 1px; color: var(--ink-soft); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.session-grid span { position: absolute; right: 0; bottom: 2px; padding: 0 2px; background: var(--surface); color: var(--ink-soft); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .session-col { position: absolute; top: 0; bottom: 0; }
 .session-col i { position: absolute; left: 0; right: 1px; bottom: 0; min-height: 1px; background: var(--uq-purple); border-radius: 2px 2px 0 0; }
 .session-col:hover { background: var(--accent-soft); }
@@ -510,12 +787,19 @@ td.wrap, th.wrap { white-space: normal; }
 /* ---- Narrow screens ---- */
 
 @media (max-width: 900px) {
+  .doc { grid-template-columns: 1fr; }
+  .doc-side { position: static; max-height: none; margin-bottom: 18px; }
   .pair, .pair-even { grid-template-columns: 1fr; }
   .pair > section + section { margin-top: 24px; }
   .pair-even table + table thead { display: none; }   /* reads as one table */
   .figures { grid-template-columns: repeat(2, 1fr); }
   .figure:nth-child(odd) { padding-left: 0; border-left: 0; }
   .figure:nth-child(n + 3) { border-top: 1px solid var(--line); }
+}
+
+@media (max-width: 640px) {
+  .progress-below { flex-direction: column; }      /* the mix drops below the text */
+  .mix { flex-basis: auto; width: 100%; }
 }
 
 @media (max-width: 520px) {

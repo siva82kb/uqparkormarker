@@ -18,10 +18,14 @@
 <section>
   <h2>What to do</h2>
   <p class="note">
-    Either restore <code>study.toml</code> to the settings above, or delete this
-    folder by hand and generate the clips again. Annotation files are kept in
-    the same folder: move them somewhere safe first. The app never deletes clips.
+    Either restore <code>study.toml</code> to the settings above, or clear the
+    old clips and generate them again. To clear them, stop the app and run the
+    command below. It deletes the clips in this folder and moves any
+    annotation files to <code>data4annotation/_archive</code>, so no labels
+    are lost. The app itself never deletes clips.
   </p>
-  <pre class="code">{{ folder }}</pre>
+  <pre class="code">uv run python reset.py
+
+{{ folder }}</pre>
 </section>
 {% endblock %}

@@ -66,11 +66,37 @@ def pools(videos: list[Video], study: dict) -> list[Pool]:
     return result
 
 
+def quotas(settings: dict) -> dict[str, int] | None:
+    """How many clips are wanted from task video and from unlabelled video.
+
+    `task_share` in study.toml is the share to take from task video; the rest
+    come from unlabelled video. None if no share is set, in which case clips
+    are drawn from all videos together.
+    """
+    share = settings.get("task_share")
+    if share is None:
+        return None
+    task = round(settings["n_segments"] * share)
+    return {"task": task, "unlabelled": settings["n_segments"] - task}
+
+
 def draw(videos: list[Video], study: dict) -> list[Segment]:
-    """Sample windows with the strategy in study.toml; number them in time order."""
+    """Sample windows with the strategy in study.toml; number them in time order.
+
+    With a `task_share`, task video and unlabelled video are sampled
+    separately, each for its own number of clips. If one kind cannot supply
+    its number, the total falls short; the other kind does not make it up.
+    """
     settings = study["sampling"]
     strategy = import_module(f"{__name__}.{settings['strategy']}")
-    windows = strategy.sample(pools(videos, study), settings["n_segments"], settings["seed"])
+    offered, wanted, seed = pools(videos, study), quotas(settings), settings["seed"]
+    if wanted is None:
+        windows = strategy.sample(offered, settings["n_segments"], seed)
+    else:
+        task = [p for p in offered if p.video.is_task]
+        unlabelled = [p for p in offered if not p.video.is_task]
+        windows = (strategy.sample(task, wanted["task"], seed)
+                   + strategy.sample(unlabelled, wanted["unlabelled"], seed + 1))
 
     zone = timezone(timedelta(hours=study["source"]["utc_offset_hours"]))
     windows.sort(key=lambda w: w.video.times[w.start_frame])

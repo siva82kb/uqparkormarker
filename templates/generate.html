@@ -3,12 +3,18 @@
 {% block page_class %}page-wide{% endblock %}
 {% block content %}
 {% set sampling = study.sampling %}
-<p class="eyebrow">Generating clips</p>
+{% set finished = clips | length > 0 %}
+<p class="eyebrow">{% if finished %}Clips ready{% else %}Generating clips{% endif %}</p>
 <h1>{{ subject }}</h1>
-<p class="lead">
-  Random {{ '%g' | format(sampling.window_seconds) }} s windows are chosen from the
-  videos and each one is cut into a short clip for annotation.
-</p>
+<div class="hero-row">
+  <p class="lead">
+    Random {{ '%g' | format(sampling.window_seconds) }} s windows are chosen from the
+    videos and each one is cut into a short clip for annotation.
+  </p>
+  {% if finished %}
+  <a class="button" href="{{ url_for('home') }}">Annotate clips</a>
+  {% endif %}
+</div>
 
 <section class="figures">
   <div class="figure">
@@ -24,7 +30,7 @@
   <div class="figure">
     <span class="figure-label">Sampling</span>
     <span class="figure-value">{{ sampling.strategy | capitalize }}</span>
-    <span class="figure-note">over recorded time, no overlap · seed {{ sampling.seed }}</span>
+    <span class="figure-note">{% if sampling.task_share is defined %}{{ '%.0f' | format(100 * sampling.task_share) }}% from task video, {{ '%.0f' | format(100 * (1 - sampling.task_share)) }}% from unlabelled · {% endif %}no overlap · seed {{ sampling.seed }}</span>
   </div>
   <div class="figure">
     <span class="figure-label">Format</span>
@@ -35,22 +41,82 @@
 
 <section>
   <div class="section-head">
-    <h2>Progress</h2>
+    {# Beside the heading, in thin text: time spent generating in all, over
+       every run, and a rough guess of the time left. Kept up to date by the script. #}
+    <h2>Progress <span class="progress-time" id="progress-time"></span></h2>
     <p class="progress-count"><span id="progress-count">{{ progress.done }} of {{ progress.total or '…' }}</span></p>
   </div>
   <div class="progress" id="progress" role="progressbar" aria-label="Clips cut"
        aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.done }}"
-       data-status-url="{{ url_for('generate_status') }}">
+       data-status-url="{{ url_for('generate_status') }}"
+       {# When cutting finishes, reload once to show the button and the list of clips. #}
+       {% if not finished %}data-reload-when-done{% endif %}>
     <div class="progress-fill" id="progress-fill"
          style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
   </div>
-  <p class="progress-message" id="progress-message" aria-live="polite">{{ progress.message or 'Starting…' }}</p>
-  <p class="progress-error" id="progress-error" {% if not progress.error %}hidden{% endif %}>{{ progress.error }}</p>
-  <p class="note" id="progress-help">
-    You can close this page. If the app is stopped, generation carries on
-    from the first missing clip the next time it starts.
-  </p>
+  {# Under the bar: what is happening now on the left; on the right, a small
+     bar of the clips cut so far, task video against unlabelled video, with a
+     mark where the split is planned to end up. The script keeps both up to
+     date as clips are cut. #}
+  <div class="progress-below">
+    <div class="progress-text">
+      {# A dot that pulses, and seconds that tick, while the app reports it is
+         working. Both stop the moment the app stops answering. #}
+      <p class="progress-message"><span class="pulse" id="progress-pulse" hidden></span><span
+         id="progress-message" aria-live="polite">{{ progress.message or 'Starting…' }}</span><span
+         class="progress-seconds" id="progress-seconds"></span></p>
+      <p class="progress-error" id="progress-error" {% if not progress.error %}hidden{% endif %}>{{ progress.error }}</p>
+      <p class="note" id="progress-help">
+        You can close this page. If the app is stopped, generation carries on
+        from the first missing clip the next time it starts.
+      </p>
+    </div>
+    <div class="mix" id="mix" hidden>
+      <div class="mix-labels">
+        <span><i class="swatch span-task"></i>Task <strong id="mix-task-count">0</strong> <span id="mix-task-share"></span></span>
+        <span><span id="mix-unlabelled-share"></span> <strong id="mix-unlabelled-count">0</strong> Unlabelled<i class="swatch span-unlabelled"></i></span>
+      </div>
+      <div class="mix-bar" id="mix-bar" role="img">
+        <div class="mix-track">
+          <div class="mix-part span-task" id="mix-task"></div>
+          <div class="mix-part span-unlabelled" id="mix-unlabelled"></div>
+        </div>
+        <span class="mix-target" id="mix-target"><span id="mix-target-label"></span></span>
+      </div>
+    </div>
+  </div>
 </section>
+
+{% if finished %}
+<section>
+  <div class="section-head">
+    <h2>The {{ clips | length }} clips, in time order</h2>
+    <p class="note">Clip number and the time its first frame was recorded, on {{ clips[0].start_time[:10] }}</p>
+  </div>
+  <p class="clip-check">
+    {% if spacing.shared %}
+    <strong>{{ spacing.shared }} pairs of clips share a frame.</strong> That should never happen; the clips need generating again.
+    {% elif spacing.closest is none %}
+    No two clips come from the same video, so none can overlap.
+    {% else %}
+    <strong>No two clips share a frame.</strong>
+    The closest pair, clips {{ spacing.pair[0] | clip_number }} and {{ spacing.pair[1] | clip_number }},
+    {% if spacing.closest %}have {{ spacing.closest }} frame{{ '' if spacing.closest == 1 else 's' }} between them{% else %}follow one another with no frame between them and none in common{% endif %}.
+    {% endif %}
+    {% if spacing.closest_starts is not none %}
+    Each clip lasts {{ '%g' | format(sampling.window_seconds) }} s; the two closest start times in the list are {{ '%.2f' | format(spacing.closest_starts) }} s apart.
+    {% if spacing.closest_starts < sampling.window_seconds and not spacing.shared %}
+    That is a shade under the length of a clip because recorded times wobble by a few hundredths of a second. The frame numbers are exact, and they show no overlap.
+    {% endif %}
+    {% endif %}
+  </p>
+  <ol class="clip-list">
+    {% for clip in clips %}
+    <li><span class="clip-number">{{ clip.segment_id | clip_number }}</span><span>{{ clip.start_time | clock }}</span></li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
 
 <section>
   <h2>Folders</h2>

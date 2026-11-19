@@ -1,0 +1,116 @@
+{% extends "docs/base.html" %}
+{% block heading %}From videos to clips{% endblock %}
+{% block lead %}
+How the app turns a participant's videos into the {{ clip_seconds }} s clips that
+raters label.
+{% endblock %}
+
+{% block body %}
+<section class="prose">
+  <h2>Words used here</h2>
+  <ul>
+    <li><strong>Video</strong>: one recorded file. A participant has about 180 to 200 of them. Each is either a <em>task</em> video (one task being performed) or an <em>unlabelled</em> video (the time between two tasks).</li>
+    <li><strong>Frame</strong>: one picture in a video. The camera takes 30 per second.</li>
+    <li><strong>Timestamp</strong>: the clock time saved with each frame.</li>
+    <li><strong>Clip</strong>: a {{ clip_seconds }} s piece cut out of a video, {{ clip_frames }} frames long. A clip is what the rater sees and labels.</li>
+  </ul>
+</section>
+
+<section class="prose">
+  <h2>Four steps</h2>
+  <ol>
+    <li><strong>Read.</strong> The app reads every video's timestamps for the chosen participant.</li>
+    <li><strong>Remove.</strong> It works out every clip that could be cut from every video, and removes the ones whose timestamps cannot be trusted. <a class="link" href="{{ url_for('docs_page', slug='timing-rule') }}">The rule</a> has its own page.</li>
+    <li><strong>Pick.</strong> From the clips that are left, it picks {{ n_clips }} at random, with no two sharing a frame{% if n_task_clips is not none %}: {{ n_task_clips }} from task video and {{ n_unlabelled_clips }} from unlabelled video{% endif %}.</li>
+    <li><strong>Cut.</strong> It cuts each picked clip out of its video and saves it as a small MP4 file, with a row in <code>segments.csv</code> saying exactly where it came from.</li>
+  </ol>
+  <p>A clip never crosses from one video into the next.</p>
+  <p class="note">The number of clips ({{ n_clips }}), the length of a clip ({{ clip_seconds }} s) and the other design choices are read from <code>study.toml</code>. This page shows the values now in that file.</p>
+</section>
+
+<section class="prose">
+  <h2>How the clips are picked</h2>
+  {% if n_task_clips is not none %}
+  <p>
+    The possible clips that were kept go into two lists: one for clips from
+    task videos, one for clips from unlabelled videos. The app picks
+    <strong>{{ n_task_clips }} from the task list and {{ n_unlabelled_clips }}
+    from the unlabelled list</strong>, which is {{ task_percent }}% from task
+    video. Within each list, <strong>every clip has the same chance</strong>.
+    A long video has more clips in its list than a short one, so it supplies
+    more, in proportion to its length.
+  </p>
+  <p>
+    The share is set on purpose. Task video is a small part of the recording,
+    so picking from everything together would give mostly clips from between
+    the tasks. If one list is too short to supply its number, fewer clips are
+    made; the other list does not make up the difference. The data summary
+    says when that happens.
+  </p>
+  {% else %}
+  <p>
+    Every possible clip that was kept goes into one list, from all videos
+    together. The app picks from that list at random, and
+    <strong>every clip in the list has the same chance</strong>. A long video
+    has more clips in the list than a short one, so it supplies more, in
+    proportion to its length.
+  </p>
+  {% endif %}
+  <ul>
+    <li>If a picked clip shares any frame with one already picked, it is thrown back and another is drawn. So no two clips overlap.</li>
+    <li>A clip can start at any frame, not only on whole seconds. One clip might run from 3.2 s to 4.2 s into a video.</li>
+    <li>The picking uses a fixed random seed, so every rater gets exactly the same clips for a participant.</li>
+  </ul>
+</section>
+
+<section class="prose">
+  <h2>Why a clip is picked, and not a moment in time</h2>
+  <p>
+    Another way would be to pick a random moment during the recording and
+    start the clip at the next frame after it. That is unfair when
+    timestamps have gaps.
+  </p>
+  <div class="example">
+    <p><strong>Think of buses.</strong> If buses come every 10 minutes and you arrive at a random time, you are equally likely to catch any of them.</p>
+    <p>But if one bus is 3 hours late, nearly everyone who arrives in those 3 hours gets on that one bus. In the same way, the frame just after a 3-second gap would be picked about 90 times more often than a normal frame.</p>
+  </div>
+  <p>Picking directly from the list avoids this: each clip is in the list once.</p>
+</section>
+
+<section>
+  <h2>What is saved for each clip</h2>
+  <p class="note">Each clip is a row in <code>segments.csv</code>.</p>
+  <table style="margin-top: 8px">
+    <thead><tr><th>Column</th><th class="wrap">Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>segment_id</code></td><td class="wrap">The clip's name, for example <code>seg_0042</code>. The clip file is <code>clips/seg_0042.mp4</code>.</td></tr>
+      <tr><td><code>video_file</code></td><td class="wrap">The video it was cut from.</td></tr>
+      <tr><td><code>start_frame</code>, <code>end_frame</code></td><td class="wrap">Its first and last frame in that video, counting from 0.</td></tr>
+      <tr><td><code>start_time</code>, <code>end_time</code></td><td class="wrap">The timestamps of those two frames, in local time.</td></tr>
+      <tr><td><code>task</code></td><td class="wrap">The task being recorded. Empty for unlabelled video.</td></tr>
+    </tbody>
+  </table>
+  <div class="prose" style="margin-top: 12px">
+    <p><code>end_time</code> is about {{ '%.2f' | format((clip_frames - 1) / 30) }} s after <code>start_time</code>, not {{ clip_seconds }} s, because {{ clip_frames }} frames have {{ clip_frames - 1 }} steps between them.</p>
+    <p>The frame numbers are exact. They are the surest record of where a clip came from.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What is saved for each label</h2>
+  <p class="note">Each rater has one file, <code>&lt;subject&gt;_&lt;rater&gt;_annotations.csv</code>. A row is added every time the rater labels a clip.</p>
+  <table style="margin-top: 8px">
+    <thead><tr><th>Column</th><th class="wrap">Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>segment_id</code></td><td class="wrap">The clip that was labelled.</td></tr>
+      <tr><td><code>label</code></td><td class="wrap">The label given, in words.</td></tr>
+      <tr><td><code>rater</code></td><td class="wrap">The rater's name.</td></tr>
+      <tr><td><code>annotated_at</code></td><td class="wrap">When the label was given, in local time.</td></tr>
+    </tbody>
+  </table>
+  <div class="prose" style="margin-top: 12px">
+    <p>A rater can go back and label a clip again. That adds a new row; the old row stays. <strong>The last row for a clip is the one that counts.</strong></p>
+    <p>Every rater sees the same clips, but in a different shuffled order. The rater does not see which task or video a clip came from.</p>
+  </div>
+</section>
+{% endblock %}

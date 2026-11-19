@@ -1,0 +1,246 @@
+{% extends "docs/base.html" %}
+{% import "docs/_figures.html" as figures %}
+{% block heading %}Clips with doubtful timestamps are never used{% endblock %}
+{% block lead %}
+The chosen answer is the simplest one: do not correct anything, and never cut
+a clip from a stretch whose timestamps cannot be trusted. This page states
+the rule, checks it on {{ subject }}, and sets out what it costs.
+{% endblock %}
+
+{% block body %}
+{% set r = report %}
+{% set limit = study.timing.max_step_seconds %}
+<section class="prose">
+  <h2>The rule</h2>
+  <p>A clip is <strong>removed</strong> if either of these is true:</p>
+  <ul>
+    <li>two neighbouring frames inside it have timestamps more than {{ '%g' | format(limit) }} s apart (a gap), or</li>
+    <li>any frame inside it has the same timestamp as the frame before it (the sign of a catch-up).</li>
+  </ul>
+  <p>
+    Every other clip is <strong>kept</strong> and can be picked. Whole videos
+    are never removed, only the affected seconds. No time is changed.
+  </p>
+  <div class="example">
+    <p><strong>Example.</strong> A 60-second video in which the program was held up for 3 seconds.</p>
+    <p>Before the hold-up the timestamps are normal: clips are kept. The hold-up is one gap of 3 s: removed. The catch-up lasts about 8 s, with bunched and repeated timestamps: removed. After that the timestamps are normal again: kept.</p>
+    <p>That video loses about 9 or 10 seconds. The other 50 seconds can still be picked.</p>
+  </div>
+  <p class="note">The {{ max_step }} s limit is <code>max_step_seconds</code> in <code>study.toml</code>.</p>
+</section>
+
+<section>
+  <figure class="fig">
+    <span class="fig-source">Made-up example</span>
+    {{ figures.rule_sketch(example) }}
+    <figcaption>
+      Four seconds of video, one tick per frame, placed at its timestamp.
+      Tall orange ticks are repeated timestamps. Four clips are tried. Two
+      are kept and two are removed. The shaded stretch is where no clip can
+      be cut, because every clip that reaches into it contains the gap or a
+      repeat.
+    </figcaption>
+  </figure>
+</section>
+
+{% if r.stretch %}
+<section>
+  <h2>The same rule on the worst stretch of {{ subject }}</h2>
+  <figure class="fig">
+    <span class="fig-source measured">Measured · {{ r.stretch.title }}</span>
+    <ul class="legend">
+      <li><span class="swatch swatch-line"></span>How late</li>
+      <li><span class="swatch swatch-late"></span>Repeated timestamp or gap</li>
+      <li><span class="swatch" style="background: var(--late-soft)"></span>Frames no clip can contain</li>
+    </ul>
+    {{ figures.stretch_chart(r.stretch, show_removed=true) }}
+    <figcaption>
+      The shaded frames are removed. The frames on white are kept, and their
+      timestamps are close to right.
+    </figcaption>
+  </figure>
+</section>
+{% endif %}
+
+<section>
+  <h2>Does the rule remove the late frames?</h2>
+  <div class="prose">
+    <p>
+      The rule looks only for gaps and repeats. It never looks at how late a
+      timestamp is. So lateness, measured as on the previous page, is a fair
+      check of it.
+    </p>
+  </div>
+  <div class="pair pair-even">
+    <figure class="fig">
+      <span class="fig-source measured">Kept · {{ '{:,}'.format(r.n_kept) }} frames</span>
+      {{ figures.band_bars(r.kept_bands) }}
+    </figure>
+    <figure class="fig">
+      <span class="fig-source measured">Removed · {{ '{:,}'.format(r.n_removed) }} frames</span>
+      {{ figures.band_bars(r.removed_bands, late=true) }}
+    </figure>
+  </div>
+  <div class="prose" style="margin-top: 14px">
+    <p>
+      {% if r.late_caught[1] %}
+      {{ '{:,}'.format(r.late_caught[1]) }} frames are more than
+      {{ '%g' | format(limit) }} s late.
+      {% if r.late_caught[0] == r.late_caught[1] %}The rule removes all of them.
+      {% else %}The rule removes {{ '{:,}'.format(r.late_caught[0]) }} of them.{% endif %}
+      {% else %}
+      No frame is more than {{ '%g' | format(limit) }} s late.
+      {% endif %}
+      The latest timestamp left in any kept frame is
+      <strong>{{ '%.0f' | format(r.kept_worst_lag * 1000) }} ms</strong> late.
+    </p>
+    <p>
+      The right-hand chart also shows the price. Many removed frames were
+      hardly late at all. The rule cannot tell them apart, so it removes
+      them too.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>What it costs in {{ subject }}</h2>
+  <div class="figures">
+    <div class="figure">
+      <span class="figure-label">Clips kept</span>
+      <span class="figure-value">{{ r.share_kept | share }}</span>
+      <span class="figure-note">of all possible clips</span>
+    </div>
+    <div class="figure">
+      <span class="figure-label">Task clips kept</span>
+      <span class="figure-value">{{ r.task_share_kept | share }}</span>
+      <span class="figure-note">of possible clips in task video</span>
+    </div>
+    <div class="figure">
+      <span class="figure-label">Footage removed</span>
+      <span class="figure-value">{{ r.removed_seconds | duration }}</span>
+      <span class="figure-note">frames no clip can contain</span>
+    </div>
+    <div class="figure">
+      <span class="figure-label">Tasks with no clip</span>
+      <span class="figure-value">{{ r.lost_tasks | length }} of {{ r.n_tasks }}</span>
+      <span class="figure-note">{{ r.lost_tasks | join('; ') | truncate(70) if r.lost_tasks else 'every task can be sampled' }}</span>
+    </div>
+  </div>
+
+  {% if r.losses %}
+  <h2 style="margin-top: 22px">Videos that lose the most</h2>
+  <table>
+    <thead>
+      <tr><th>Video</th><th class="num">Starts at</th><th class="num">Length</th><th class="num">Removed</th><th class="num">Latest timestamp</th></tr>
+    </thead>
+    <tbody>
+      {% for v in r.losses %}
+      <tr>
+        <td class="wrap">{{ v.label }}</td>
+        <td class="num dim">{{ v.clock }}</td>
+        <td class="num">{{ v.seconds | duration }}</td>
+        <td class="num">{{ v.removed_seconds | duration }}</td>
+        <td class="num">{{ '%.0f' | format(v.worst_lag_ms) }} ms</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Across the six participants checked</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th></th><th class="num">Least affected</th><th class="num">Other five</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Frames more than 0.2 s late</td><td class="num">0.03%</td><td class="num">2 to 3.3%</td></tr>
+        <tr><td>Latest timestamp</td><td class="num">0.55 s</td><td class="num">2 to 11 s</td></tr>
+        <tr><td>Clips kept</td><td class="num">97.5%</td><td class="num">88 to 95%</td></tr>
+        <tr><td>Task clips kept</td><td class="num">95%</td><td class="num">76 to 84%</td></tr>
+        <tr><td>Tasks with no clip, of 91</td><td class="num">1</td><td class="num">6 to 8</td></tr>
+        <tr><td>Latest timestamp in a kept clip</td><td class="num">76 ms</td><td class="num">82 to 211 ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top: 8px">
+    From a survey on 19 November 2026 of the six participants whose videos
+    sit directly in their video folder. Only the least affected participant
+    is used for the first paper.
+  </p>
+</section>
+
+<div class="pair pair-even">
+  <section>
+    <h2>For the rule</h2>
+    <ul class="verdicts for">
+      <li><strong>Simple.</strong> Two checks that anyone can repeat from the timestamp files.</li>
+      <li><strong>No time is changed.</strong> Every time written out is a timestamp as recorded.</li>
+      <li><strong>Few assumptions.</strong> It needs only this: a late stretch shows a gap or a repeat. It does not need the camera to run at a steady rate.</li>
+      <li><strong>Checked.</strong> In five of six participants the latest kept timestamp was 76 to 128 ms late. In the sixth it was 211 ms.</li>
+      <li><strong>Keeps most footage.</strong> Only the affected seconds go. No video is dropped whole.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Against the rule</h2>
+    <ul class="verdicts against">
+      <li><strong>Footage is lost.</strong> Between 2.5% and 12% of possible clips, and up to 24% of task clips.</li>
+      <li><strong>Some tasks vanish.</strong> A short task that falls inside a late stretch has no clip left: 1 to 8 of the 91 tasks.</li>
+      <li><strong>The sample is tilted.</strong> Removed seconds cluster where the program was busy, often as a task starts. Behaviour at those moments is under-sampled.</li>
+      <li><strong>It removes good frames too.</strong> A repeated timestamp can come from a hold-up of one frame. The rule removes the second around it all the same.</li>
+      <li><strong>Not a guarantee.</strong> One participant kept a clip 211 ms late. And the check itself gives the <em>least</em> a timestamp can be late.</li>
+      <li><strong>Small errors stay.</strong> A timestamp can still be one frame off (about 30 ms), and the fixed delay between filming and stamping is not measured.</li>
+    </ul>
+  </section>
+</div>
+
+<section>
+  <h2>Other ways that were considered</h2>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Way</th><th class="wrap">What it does</th><th class="wrap">For</th><th class="wrap">Against</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="wrap">Do nothing</td>
+          <td class="wrap">Use every timestamp as saved.</td>
+          <td class="wrap">No footage lost.</td>
+          <td class="wrap">Some clips would be seconds out against the sensors, with no sign of it.</td>
+        </tr>
+        <tr>
+          <td class="wrap">Count frames</td>
+          <td class="wrap">Ignore timestamps. Take frame 900 to be 30 s in.</td>
+          <td class="wrap">Immune to late timestamps.</td>
+          <td class="wrap">Every session has 0.6 to 17.7 s with no frames, so the count drifts by that much.</td>
+        </tr>
+        <tr class="chosen">
+          <td class="wrap">Remove <span class="tag">Chosen</span></td>
+          <td class="wrap">Never use a clip with a gap or a repeat. This page.</td>
+          <td class="wrap">Simple, changes no time, checked on six participants.</td>
+          <td class="wrap">Loses footage and some tasks. Tilts the sample.</td>
+        </tr>
+        <tr>
+          <td class="wrap">Correct</td>
+          <td class="wrap">Work out when each frame was filmed from the frames after it, as in the lateness measure.</td>
+          <td class="wrap">Keeps all footage and all tasks.</td>
+          <td class="wrap">Assumes a steady camera with no lost frames, which the missing seconds contradict. Gives a limit, not the true time. Changes the times written out, so it must be validated first, for example against the jump landings.</td>
+        </tr>
+        <tr>
+          <td class="wrap">Correct and report</td>
+          <td class="wrap">Correct as above, and save each clip's lateness with it.</td>
+          <td class="wrap">Most information. A reader can decide what to trust.</td>
+          <td class="wrap">Everything against "Correct", and more to explain.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="margin-top: 8px">
+    "Remove" was chosen as the quickest safe answer for the first paper. The
+    two correcting ways are not ruled out. Neither has been agreed or built.
+  </p>
+</section>
+{% endblock %}

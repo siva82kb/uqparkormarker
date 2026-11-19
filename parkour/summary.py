@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from statistics import median
 
-from . import timing
+from . import sampling, timing
 from .dataset import Video
 
 GAP_SECONDS = 1.0          # report silences between files longer than this
@@ -50,7 +50,13 @@ class Summary:
     tasks: list[TaskRow]
     timeline: list[Span]
     ticks: list[tuple[str, float]]   # clock label and position (%) along the strip
-    n_windows: int
+    n_windows: int                   # clips that fit: n_windows_task + the rest
+    n_windows_task: int
+    quotas: dict[str, int] | None    # clips wanted from task and unlabelled video
+
+    @property
+    def n_windows_unlabelled(self) -> int:
+        return self.n_windows - self.n_windows_task
 
     @property
     def n_videos(self) -> int:
@@ -98,26 +104,30 @@ def build(videos: list[Video], study: dict, missing: list[str] = ()) -> Summary:
         timeline=spans,
         ticks=ticks(start, end) if usable else [],
         n_windows=windows.fitting,
+        n_windows_task=windows.fitting_task,
+        quotas=sampling.quotas(study["sampling"]),
     )
 
 
 @dataclass
 class _Windows:
     fitting: int            # non-overlapping windows with trustworthy timestamps
-    notes: list[str]        # what the timestamp rule leaves out
+    fitting_task: int       # those of them that lie in task video
+    notes: list[str]        # what the timestamp rule leaves out, and any shortfall
 
 
 def _windows(usable: list[Video], study: dict) -> _Windows:
     """Count the windows that can be sampled, and say what the rule excludes."""
     seconds = study["sampling"]["window_seconds"]
     max_step = study["timing"]["max_step_seconds"]
-    fitting = possible = allowed = 0
+    fitting = fitting_task = possible = allowed = 0
     per_task: dict[int, int] = defaultdict(int)
     for v in usable:
         frames = timing.frames_per_window(v, seconds)
         starts = timing.clean_starts(v, frames, max_step)
         fits = timing.count_fitting(starts, frames)
         fitting += fits
+        fitting_task += fits if v.is_task else 0
         allowed += len(starts)
         possible += max(0, len(v.times) - frames + 1) if frames >= 2 else 0
         if v.is_task:
@@ -135,7 +145,18 @@ def _windows(usable: list[Video], study: dict) -> _Windows:
             verb = "has" if empty == 1 else "have"
             note += f" {empty} of the {len(per_task)} tasks {verb} no usable window."
         notes.append(note)
-    return _Windows(fitting, notes)
+
+    # Is there room for the number of clips wanted from each kind of video?
+    wanted = sampling.quotas(study["sampling"]) or {}
+    room = {"task": fitting_task, "unlabelled": fitting - fitting_task}
+    for kind, number in wanted.items():
+        if number > room[kind]:
+            notes.append(
+                f"{number} clips are wanted from {kind} video, but it has room for "
+                f"only {room[kind]}. Fewer clips will be made; the other kind of "
+                "video does not make up the difference."
+            )
+    return _Windows(fitting, fitting_task, notes)
 
 
 def _local(microseconds: int, zone: timezone) -> datetime:

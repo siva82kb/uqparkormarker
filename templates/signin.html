@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<p class="eyebrow">Sign in</p>
+<h1>Who is labelling?</h1>
+<p class="lead">
+  Your labels are saved in a file that carries your name, separate from every
+  other rater's.
+</p>
+
+<form class="signin" method="post" action="{{ url_for('signin_page') }}">
+  <label for="name">Your name</label>
+  <input id="name" name="name" type="text" value="{{ typed }}" required autofocus
+         autocomplete="off" maxlength="60" {% if rejected %}aria-invalid="true" aria-describedby="name-error"{% endif %}>
+  {% if rejected %}
+  <p class="field-error" id="name-error">Please use at least one letter or number.</p>
+  {% endif %}
+  <button class="button" type="submit">Start</button>
+</form>
+
+<p class="note">
+  The name is turned into a simple form for the file name: lower-case letters,
+  numbers and underscores, so "Ann Lee" becomes <code>ann_lee</code>. It is
+  asked once on this computer. To change it later, edit <code>local.toml</code>.
+</p>
+{% endblock %}

@@ -15,7 +15,8 @@ max_step_seconds = 0.1
 
 [sampling]
 strategy = "uniform"      # a module name in parkour/sampling/
-n_segments = 500          # upper limit per subject
+n_segments = 25           # upper limit per subject
+task_share = 0.7          # share of clips taken from task video; the rest come from unlabelled video
 window_seconds = 1.0      # every clip is this long at the video's frame rate (30 frames at 30 fps)
 seed = 20221125           # fixed, so every rater gets the same windows
 

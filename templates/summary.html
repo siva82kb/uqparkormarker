@@ -25,6 +25,15 @@
   {% endif %}
 </div>
 
+<form class="read-note" method="post" action="{{ url_for('summary_reread') }}">
+  <span>
+    {% if read_at %}Read from the source videos on {{ read_at.strftime('%d %B %Y').lstrip('0') }} at {{ read_at.strftime('%H:%M') }}.{% endif %}
+    This summary is saved and is not read again when the app starts.
+  </span>
+  <button class="link-button" type="submit"
+          title="Reads every video's timestamps from the source folder again. Takes a minute or two.">Read the videos again</button>
+</form>
+
 <section class="figures">
   <div class="figure">
     <span class="figure-label">Videos</span>
@@ -44,7 +53,8 @@
   <div class="figure">
     <span class="figure-label">{{ '%g' | format(study.sampling.window_seconds) }} s windows available</span>
     <span class="figure-value">{{ '{:,}'.format(s.n_windows) }}</span>
-    <span class="figure-note">up to {{ study.sampling.n_segments }} will be sampled</span>
+    <span class="figure-note">{{ '{:,}'.format(s.n_windows_task) }} task · {{ '{:,}'.format(s.n_windows_unlabelled) }} unlabelled.
+      {% if s.quotas %}{{ s.quotas.task }} task and {{ s.quotas.unlabelled }} unlabelled will be sampled{% else %}Up to {{ study.sampling.n_segments }} will be sampled{% endif %}</span>
   </div>
 </section>
 

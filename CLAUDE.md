@@ -10,17 +10,40 @@ See `README.md` for usage and `PLAN.md` for the design and open decisions.
   and imageio-ffmpeg.
 - `app.py` holds routes only. Logic lives in the `parkour/` package.
 - Storage is plain CSV. No database.
+- The app never deletes clips or labels. Only `reset.py`, run by hand,
+  clears a subject, and it moves annotation files to
+  `data4annotation/_archive/` instead of deleting them.
+- The title bar links only to Data summary, Annotation summary and Docs.
+  Steps of normal use (generating, annotating) get no link there; pages
+  offer them as buttons when they are available. Anything that explains
+  the method or its problems is a docs page, listed in `parkour/docs.py`.
 - The website is beautiful, minimal, professional and clean: plain HTML, one 
   stylesheet, one script, no front-end framework.
+
+## Lessons from bugs
+
+- **Never let a browser keep a clip.** On 2026-11-19 clips were served with
+  a one-hour cache under addresses that are reused when clips are generated
+  again (`seg_0001.mp4` ...). After regenerating, the browser showed the old
+  videos, and labels were saved against the wrong clips. Clip addresses now
+  carry a code for the set and are served `no-store`. Keep both. The same
+  applies to anything else whose name is reused for new content.
+- **Test a setting on a fresh start as well as on a resumed one.** The
+  `clip_limit` test setting worked when the clip list already existed and
+  was ignored the first time a list was made.
 
 ## Documentation
 
 - The `.md` files must never be out of sync with the code. Any change to
   behaviour, folder layout, settings or build status updates `PLAN.md`,
-  `README.md`, `docs/HOW_IT_WORKS.md` and this file in the same piece of work.
-- `docs/HOW_IT_WORKS.md` explains the method for people who will interpret
-  the results. Write it in short, plain sentences with worked examples; the
-  user finds dense technical wording hard to follow.
+  `README.md`, the docs pages in the app and this file in the same piece of work.
+- The docs pages in the app (`templates/docs/`, listed in
+  `parkour/docs.py`) are the only explanation of the method, for people
+  who will interpret the results. Keep one copy: do not add a text
+  version elsewhere. Write them in short, plain sentences with worked
+  examples; the user finds dense technical wording hard to follow.
+- Docs pages never write out a value that `study.toml` sets (number of
+  clips, clip length, gap limit). They print what `docs.settings()` gives.
 - Use one word per thing: a *video* is a recorded file, a *clip* is a
   one-second piece of it. Do not also call a clip a window or a segment in
   explanations.
@@ -83,9 +106,18 @@ the sync to the sensors remain to be done.
   computer's clock, which is not yet known. The app's job is only to hand
   over clips with exact frame numbers and well-timed stamps.
 - **Current state of the code.** Windows failing the rule above are not
-  sampled; every allowed window start is equally likely. `start_time` and
+  sampled. Task video and unlabelled video are sampled separately
+  (`task_share` in `study.toml`), and within each every allowed window start
+  is equally likely. `start_time` and
   `end_time` in `segments.csv` are raw stamps of the first and last frame.
   The share of windows left out is shown on the summary page.
+- **Docs pages.** Four pages under `/docs` (`timing-problem`,
+  `timing-evidence`, `timing-rule`, `timing-open`) explain the problem, show
+  it in the loaded subject's stamps, and set out the rule with its pros,
+  cons and the alternatives (`PLAN.md` section 3a). `lag.py` measures
+  lateness for these pages only (option (b)'s limit, used as a
+  measurement, never to correct). The survey figures on the rule page are
+  fixed text; update them if the survey is redone.
 
 ## Environment
 
@@ -96,6 +128,10 @@ the sync to the sensors remain to be done.
   and subject in use are in `local.toml` (not committed).
 - The RDM is slow over the VPN: one to two seconds to open any file. Do not
   scan it recursively; list one folder at a time and read files in parallel.
+- Anything slow to produce for a subject is produced once and saved under
+  `data4annotation/<subject>/` with the time it was made, then reused. It
+  is redone only when the user asks. The timestamps read from the videos
+  are saved this way (`parkour/recording_store.py`).
 - `data/221125_SK_Test` is an early test recording with an older layout
   (`videos/` subfolder, 10 fps). The app no longer reads it.
 - `private/` holds the user's older analysis code and data. Read-only reference.

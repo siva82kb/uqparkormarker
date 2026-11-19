@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Clip {{ position + 1 }} of {{ total }}{% endblock %}
+{% block page_class %}page-wide page-annotate{% endblock %}
+{% block content %}
+<div class="annotate-head">
+  <p class="eyebrow">{% if reviewing %}Looking back{% else %}Labelling{% endif %}</p>
+  <p class="annotate-count">Clip <strong>{{ position + 1 }}</strong> of {{ total }} · {{ labelled }} labelled</p>
+</div>
+<div class="progress progress-slim" role="progressbar" aria-label="Clips labelled"
+     aria-valuemin="0" aria-valuemax="{{ total }}" aria-valuenow="{{ labelled }}">
+  <div class="progress-fill" style="width: {{ 100 * labelled / total }}%"></div>
+</div>
+
+<video class="clip" src="{{ url_for('clip_file', clip_set=clip_set, segment_id=clip.segment_id) }}"
+       autoplay loop muted playsinline></video>
+
+{% if reviewing %}
+<p class="annotate-note">
+  You labelled this clip <strong>{{ current }}</strong>. Label it again to change
+  that, or <a class="link" href="{{ url_for('annotate_page') }}">carry on where you left off</a>.
+</p>
+{% endif %}
+
+{# One form for all five labels. The script fills in the key and submits,
+   and only when Shift is held down. #}
+<form id="annotate" method="post" action="{{ url_for('annotate_page') }}"
+      data-previous="{% if position > 0 %}{{ url_for('annotate_page', position=position - 1) }}{% endif %}">
+  <input type="hidden" name="segment_id" value="{{ clip.segment_id }}">
+  <input type="hidden" name="key" id="annotate-key">
+  <div class="labels" role="group" aria-label="Label for this clip">
+    {% for label in labels %}
+    <button class="label {% if label.name == current %}label-current{% endif %}"
+            type="button" data-key="{{ label.key }}">
+      <kbd>{{ label.key }}</kbd>
+      <span>{{ label.name }}</span>
+    </button>
+    {% endfor %}
+  </div>
+</form>
+
+<p class="annotate-hint" id="annotate-hint" aria-live="polite"
+   data-idle="Hold Shift and press 1 to {{ labels | length }}, or hold Shift and click a label. Backspace goes back one clip."
+   data-armed="Shift is down. Press 1 to {{ labels | length }} or click a label."
+   data-refused="Not saved. Hold Shift as well, so that a slip of the hand is never saved as a label."
+   >Hold Shift and press 1 to {{ labels | length }}, or hold Shift and click a label. Backspace goes back one clip.</p>
+{% endblock %}

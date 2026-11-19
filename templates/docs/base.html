@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{# Frame shared by every docs page: previous and next links at the top and
+   the bottom, and the page's sections in a column on the left (filled in by
+   app.js from the page's headings). #}
+{% block title %}{{ page.title }} · Docs{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+
+{% macro pager(place) %}
+<nav class="pager pager-{{ place }}" aria-label="Previous and next page ({{ place }})">
+  {% if previous %}
+  <a class="pager-link" href="{{ url_for('docs_page', slug=previous.slug) }}">
+    <span class="pager-way">← Previous</span><span class="pager-title">{{ previous.title }}</span>
+  </a>
+  {% else %}<span></span>{% endif %}
+  {% if following %}
+  <a class="pager-link pager-next" href="{{ url_for('docs_page', slug=following.slug) }}">
+    <span class="pager-way">Next →</span><span class="pager-title">{{ following.title }}</span>
+  </a>
+  {% endif %}
+</nav>
+{% endmacro %}
+
+{% block content %}
+<div class="doc">
+  <aside class="doc-side">
+    <a class="doc-up" href="{{ url_for('docs_index') }}">← All docs</a>
+    <p class="doc-side-head">On this page</p>
+    <nav id="doc-sections" aria-label="Sections of this page"></nav>
+  </aside>
+
+  <article class="doc-main" id="doc-main">
+    {{ pager('top') }}
+    <p class="eyebrow">{{ group.title }}</p>
+    <h1 class="title">{% block heading %}{% endblock %}</h1>
+    <p class="lead prose">{% block lead %}{% endblock %}</p>
+    {% block body %}{% endblock %}
+    {{ pager('bottom') }}
+  </article>
+</div>
+{% endblock %}

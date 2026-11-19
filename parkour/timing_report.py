@@ -21,13 +21,6 @@ STRETCH_FLOOR = 0.03        # a late stretch lasts while the lag stays above thi
 STRETCH_PAD = 20            # frames shown either side of the stretch
 STRETCH_MAX = 240           # most frames shown
 LAG_BANDS = [(0, 25), (25, 50), (50, 75), (75, 100), (100, 200), (200, 400), (400, None)]
-STEP_BANDS = [              # label, lowest (ms, inclusive), highest (ms, exclusive)
-    ("Exactly 0 (repeated stamp)", None, 0.0005),
-    ("Up to 20 ms", 0.0005, 20),
-    ("20 to 45 ms (normal)", 20, 45),
-    ("45 to 100 ms", 45, 100),
-    ("Over 100 ms (pause)", 100, None),
-]
 MOST_AFFECTED = 8           # rows in the table of videos that lose most
 
 
@@ -153,9 +146,9 @@ def build(videos: list[Video], study: dict) -> Report | None:
     span = (max(v.times[-1] for v in usable) - origin) or 1
     start, end = _local(origin, zone), _local(origin + span, zone)
     columns = _columns(measured, origin, span, zone)
-    tasks = {m.video.task_number for m in measured if m.video.is_task}
+    tasks = {v.task_number for v in usable if v.is_task}
     alive = {m.video.task_number for m in measured if m.video.is_task and m.allowed}
-    names = {m.video.task_number: summary.task_title(m.video) for m in measured}
+    names = {v.task_number: summary.task_title(v) for v in usable if v.is_task}
 
     return Report(
         n_frames=len(all_lags),
@@ -165,8 +158,8 @@ def build(videos: list[Video], study: dict) -> Report | None:
         share_late=sum(x >= LATE_SECONDS for x in all_lags) / len(all_lags),
         worst_lag=max(all_lags),
         missing_seconds=_missing(usable, span),
-        steps=_bands([s * 1000 for s in all_steps], STEP_BANDS),
-        stretch=_stretch(max(measured, key=lambda m: max(m.lags))),
+        steps=_bands([s * 1000 for s in all_steps], _step_bands(max_step)),
+        stretch=_stretch(max(measured, key=lambda m: max(m.lags)), max_step),
         columns=columns,
         column_axis=chart.axis(0, max(c.lag_ms for c in columns), about=4),
         removed_spans=_removed_spans(measured, origin, span),
@@ -225,6 +218,18 @@ def _bands(values: list[float], bands: list[tuple]) -> list[Band]:
     return found
 
 
+def _step_bands(max_step: float) -> list[tuple]:
+    """Bands for the steps between stamps; the last starts at the rule's limit."""
+    limit = max_step * 1000
+    return [                # label, lowest (ms, inclusive), highest (ms, exclusive)
+        ("Exactly 0 (repeated timestamp)", None, 0.0005),
+        ("Up to 20 ms", 0.0005, 20),
+        ("20 to 45 ms (normal)", 20, 45),
+        (f"45 to {limit:g} ms", 45, limit),
+        (f"Over {limit:g} ms (gap)", limit, None),
+    ]
+
+
 def _lag_bands(lags_seconds: list[float]) -> list[Band]:
     bands = [
         (f"{low} to {high} ms" if high else f"Over {low} ms", low, high)
@@ -233,7 +238,7 @@ def _lag_bands(lags_seconds: list[float]) -> list[Band]:
     return _bands([x * 1000 for x in lags_seconds], bands)
 
 
-def _stretch(m: _Measured) -> Stretch:
+def _stretch(m: _Measured, max_step: float) -> Stretch:
     """The frames around the largest lag in a video, for the close-up."""
     peak = max(range(len(m.lags)), key=m.lags.__getitem__)
     first = last = peak
@@ -250,7 +255,7 @@ def _stretch(m: _Measured) -> Stretch:
             step_ms=m.steps[i - 1] * 1000 if i else None,
             lag_ms=m.lags[i] * 1000,
             repeat=i > 0 and m.steps[i - 1] <= 0,
-            pause=i > 0 and m.steps[i - 1] > 0.1,
+            pause=i > 0 and m.steps[i - 1] > max_step,
             removed=m.removed[i],
         )
         for i in range(first, last + 1)

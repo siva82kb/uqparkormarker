@@ -1,0 +1,126 @@
+{% extends "docs/base.html" %}
+{% import "docs/_figures.html" as figures %}
+{% block heading %}What the timestamps of {{ subject }} show{% endblock %}
+{% block lead %}
+Everything on this page is measured from this participant's own timestamp
+files. Nothing here is made up, and nothing is corrected.
+{% endblock %}
+
+{% block body %}
+{% set r = report %}
+<section class="figures">
+  <div class="figure">
+    <span class="figure-label">Frames</span>
+    <span class="figure-value">{{ '{:,}'.format(r.n_frames) }}</span>
+    <span class="figure-note">each with one timestamp</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Repeated timestamps</span>
+    <span class="figure-value">{{ '{:,}'.format(r.n_repeats) }}</span>
+    <span class="figure-note">same time as the frame before</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Gaps over {{ '%g' | format(study.timing.max_step_seconds) }} s</span>
+    <span class="figure-value">{{ r.n_pauses }}</span>
+    <span class="figure-note">longest {{ '%.2f' | format(r.longest_step) }} s</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Latest timestamp</span>
+    <span class="figure-value">{{ '%.2f' | format(r.worst_lag) }} s late</span>
+    <span class="figure-note">{{ r.share_late | share }} of frames are 0.2 s late or more</span>
+  </div>
+</section>
+
+<section class="prose">
+  <h2>How lateness is measured</h2>
+  <p>We cannot see when a frame was really filmed. The measure rests on two things.</p>
+  <ul>
+    <li><strong>Known:</strong> a frame was filmed no later than its own timestamp, because a timestamp is never early.</li>
+    <li><strong>Assumed:</strong> the camera films at a steady 30 frames a second. Then a frame was filmed at least 1/30 s before the next one, 2/30 s before the one after, and so on.</li>
+  </ul>
+  <div class="example">
+    <p><strong>Example.</strong> Frame 100 has the timestamp 10.50 s. Frame 103 has the timestamp 10.52 s.</p>
+    <p>
+      Frame 103 was filmed by 10.52 s. Frame 100 came three frames earlier,
+      so it was filmed by 10.52 − 0.10 = 10.42 s. Its timestamp says 10.50 s.
+      So that timestamp is <strong>at least 0.08 s late</strong>.
+    </p>
+  </div>
+  <p>
+    This gives the <em>least</em> a timestamp can be late. The true lateness
+    can be larger, never smaller. It is used here only to look at the
+    problem. It is not used to change any time.
+  </p>
+</section>
+
+{% if r.stretch %}
+<section>
+  <h2>The worst late stretch, frame by frame</h2>
+  <figure class="fig">
+    <span class="fig-source measured">Measured · {{ r.stretch.title }}</span>
+    <ul class="legend">
+      <li><span class="swatch swatch-line"></span>How late</li>
+      <li><span class="swatch swatch-kept"></span>Normal step</li>
+      <li><span class="swatch swatch-late"></span>Repeated timestamp (step of 0) or gap</li>
+    </ul>
+    {{ figures.stretch_chart(r.stretch) }}
+    <figcaption>
+      Top: lateness falls step by step as the program catches up. Bottom:
+      a normal step is about 33 ms. Each orange dot at 0 is a frame with
+      exactly the same timestamp as the frame before it. This is the same
+      shape as the made-up example on the previous page.
+    </figcaption>
+  </figure>
+</section>
+{% endif %}
+
+<section>
+  <h2>The whole session</h2>
+  <figure class="fig">
+    <span class="fig-source measured">Measured · all {{ '{:,}'.format(r.n_frames) }} frames</span>
+    <ul class="legend">
+      <li><span class="swatch span-task"></span>Largest lateness in each slice of the session</li>
+      <li><span class="swatch swatch-late"></span>Frames removed by the rule</li>
+    </ul>
+    {{ figures.session_chart(r) }}
+    <figcaption>
+      The session is cut into {{ r.columns | length }} equal slices. Each
+      column is the latest timestamp in that slice. Late stretches are short
+      and scattered. The orange marks show the frames the rule on the next
+      page removes: they sit under the tall columns.
+    </figcaption>
+  </figure>
+</section>
+
+<div class="pair pair-even">
+  <section>
+    <h2>Steps between neighbouring timestamps</h2>
+    <table>
+      <thead><tr><th>Step</th><th class="num">Count</th><th class="num">Share</th></tr></thead>
+      <tbody>
+        {% for b in r.steps %}
+        <tr><td>{{ b.label }}</td><td class="num">{{ '{:,}'.format(b.count) }}</td><td class="num">{{ b.share | share }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note" style="margin-top: 8px">
+      A normal step is 33 ms. Steps a little longer than that are common and harmless:
+      the program was a frame or two behind for a moment.
+    </p>
+  </section>
+
+  <section class="prose">
+    <h2>Time with no frames</h2>
+    <p>
+      From first timestamp to last, the session lasts
+      {{ '%.1f' | format(r.missing_seconds) }} s longer than its frames
+      account for at 30 frames a second. For that time there are no frames at
+      all.
+    </p>
+    <p>
+      This is why frame counting cannot replace the timestamps over a whole
+      session.
+    </p>
+  </section>
+</div>
+{% endblock %}

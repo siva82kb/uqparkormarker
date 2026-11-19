@@ -1,0 +1,43 @@
+{% extends "docs/base.html" %}
+{% block heading %}What to keep in mind when reading the results{% endblock %}
+{% block lead %}
+The labels describe a particular sample of the footage, with times of a
+particular accuracy. This page says what both of those are.
+{% endblock %}
+
+{% block body %}
+<section>
+  <h2>What the clips are a sample of</h2>
+  <ul class="problems">
+    <li><strong>A random sample of the trustworthy footage, not of all footage.</strong> The removed seconds cluster around moments when the recording program was busy, often the start of a task. If behaviour at those moments differs from the rest, the sample will not show it.</li>
+    <li><strong>Some tasks may not appear at all.</strong> A task can be missing from the clips by chance, or because all its footage was removed. The data summary says how many tasks have no usable clip.</li>
+    {% if n_task_clips is not none %}
+    <li><strong>The clips do not follow the footage.</strong> {{ task_percent }}% of the clips are taken from task video on purpose ({{ n_task_clips }} of {{ n_clips }}), although task video is a much smaller part of the recording (about a seventh, in the participant used so far). So a figure worked out over all clips together, such as "the share of clips labelled functional", describes this mix of clips. It does not describe the session as a whole. To say something about the whole session, work out the figure for task clips and for unlabelled clips separately, then weight the two by how much of the recording each kind makes up.</li>
+    <li><strong>Within task video, and within unlabelled video, the clips do follow the footage.</strong> A long task supplies more clips than a short one.</li>
+    {% else %}
+    <li><strong>Most clips come from unlabelled video</strong>, because most of the recording is unlabelled video. The clips follow the footage.</li>
+    {% endif %}
+    <li><strong>Only one participant is used so far</strong>, the one least affected by the timestamp problem. Other participants would lose more footage and more tasks.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>How exact the clip times are</h2>
+  <ul class="problems">
+    <li><strong>Right to about {{ max_step }} s, on the video computer's clock.</strong> Within that, a timestamp can be off by one frame (0.03 s).</li>
+    <li><strong>There is a fixed delay that has not been measured.</strong> Every timestamp is taken a little after the frame was filmed, because the picture has to travel from the camera to the program. This is probably a few hundredths of a second, and the same for every frame.</li>
+    <li><strong>Clip times are not yet on the sensors' clock.</strong> Each session has a jump task at the start and at the end for this purpose. This step has not been done. See <a class="link" href="{{ url_for('docs_page', slug='timing-open') }}">what the rule does not settle</a>.</li>
+    <li><strong>The jump videos themselves need checking.</strong> In most participants one or both contain a few affected frames, so the landings should be read from parts where the timestamps are normal.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>What has not been settled</h2>
+  <ul class="problems">
+    <li>A proper fix for the late timestamps, which would allow the removed seconds to be used. It has not been adopted.</li>
+    <li>Whether the version of the recording program used for the study stamps frames in the same way as the published version that was examined.</li>
+    <li>How each sensor system records time, and so whether the jumps are needed to line the data up or only to check it.</li>
+    <li>Participants whose videos are stored in session subfolders are not yet read by the app.</li>
+  </ul>
+</section>
+{% endblock %}

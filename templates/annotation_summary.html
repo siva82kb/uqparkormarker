@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Annotation summary · {{ subject }}{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+{% block content %}
+<p class="eyebrow">Annotation summary</p>
+<h1>{{ subject }}</h1>
+
+<div class="hero-row">
+  <p class="lead">
+    {% if not total %}No clips have been generated for this participant yet.
+    {% elif not ready %}The clips are still being generated. Annotation opens when all {{ total }} are ready.
+    {% elif labelled == total %}All {{ total }} clips are labelled.
+    {% elif labelled %}{{ labelled }} of {{ total }} clips are labelled.
+    {% else %}{{ total }} clips are ready. None is labelled yet.{% endif %}
+  </p>
+  {% if ready and labelled < total %}
+  <a class="button" href="{{ url_for('annotate_page') }}">{{ 'Continue annotating' if labelled else 'Start annotating' }}</a>
+  {% elif ready %}
+  <a class="button button-quiet" href="{{ url_for('annotate_page', position=total - 1) }}">Look back through the clips</a>
+  {% elif not total %}
+  <a class="button button-quiet" href="{{ url_for('summary_page') }}">Go to the data summary</a>
+  {% else %}
+  <a class="button button-quiet" href="{{ url_for('generate_page') }}">See progress</a>
+  {% endif %}
+</div>
+
+{% if total %}
+<section class="figures">
+  <div class="figure">
+    <span class="figure-label">Rater</span>
+    <span class="figure-value">{{ rater }}</span>
+    <span class="figure-note">one file per rater</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Clips</span>
+    <span class="figure-value">{{ total }}</span>
+    <span class="figure-note">the same for every rater</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Labelled</span>
+    <span class="figure-value">{{ labelled }}</span>
+    <span class="figure-note">{{ '%.0f' | format(100 * labelled / total) }}% of the clips</span>
+  </div>
+  <div class="figure">
+    <span class="figure-label">Still to label</span>
+    <span class="figure-value">{{ total - labelled }}</span>
+    <span class="figure-note">{{ 'nothing more to do' if labelled == total else 'shown in your own shuffled order' }}</span>
+  </div>
+</section>
+
+<section>
+  <h2>Progress</h2>
+  <div class="progress" role="img" aria-label="{{ labelled }} of {{ total }} clips labelled">
+    <div class="progress-fill" style="width: {{ 100 * labelled / total }}%"></div>
+  </div>
+</section>
+
+<div class="pair">
+  <section>
+    <h2>Your labels so far</h2>
+    <table>
+      <thead>
+        <tr><th>Label</th><th class="num">Clips</th><th class="num">Share of labelled</th></tr>
+      </thead>
+      <tbody>
+        {% for name, count in counts.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          <td class="num">{{ count }}</td>
+          <td class="num">{% if labelled %}{{ '%.0f' | format(100 * count / labelled) }}%{% else %}–{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Where they are saved</h2>
+    <dl class="facts">
+      <div><dt>File</dt><dd class="path">{{ file }}</dd></div>
+    </dl>
+    <p class="note" style="margin-top: 8px">
+      One row is added every time you label a clip. If you change a label,
+      the last row for that clip is the one that counts.
+    </p>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

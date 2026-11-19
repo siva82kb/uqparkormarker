@@ -26,3 +26,26 @@ def load_study() -> dict:
 def load_local() -> dict | None:
     """This machine's setup, or None if setup has not been done yet."""
     return _load(LOCAL_FILE) if LOCAL_FILE.exists() else None
+
+
+def set_local(key: str, text: str) -> None:
+    """Set one text value in local.toml, leaving the rest of the file as it is."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    line = f'{key} = "{escaped}"'
+    lines = LOCAL_FILE.read_text(encoding="utf-8").splitlines() if LOCAL_FILE.exists() else []
+    for i, existing in enumerate(lines):
+        if existing.split("=")[0].strip() == key:
+            lines[i] = line
+            break
+    else:
+        lines.append(line)
+    LOCAL_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def remove_local(key: str) -> None:
+    """Take one value out of local.toml, leaving the rest of the file as it is."""
+    if not LOCAL_FILE.exists():
+        return
+    lines = LOCAL_FILE.read_text(encoding="utf-8").splitlines()
+    kept = [line for line in lines if line.split("=")[0].strip() != key]
+    LOCAL_FILE.write_text("\n".join(kept) + "\n", encoding="utf-8")

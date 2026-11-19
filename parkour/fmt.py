@@ -1,5 +1,7 @@
 """Format values for display. Used as template filters."""
 
+from datetime import datetime
+
 
 def duration(seconds: float) -> str:
     """Seconds as a short readable length: '8.4 s', '2 min 05 s', '1 h 01 min'."""
@@ -10,6 +12,18 @@ def duration(seconds: float) -> str:
         return f"{minutes} min {secs:02d} s"
     hours, minutes = divmod(minutes, 60)
     return f"{hours} h {minutes:02d} min"
+
+
+def clock(iso_time: str) -> str:
+    """The time of day from an ISO timestamp, to the millisecond:
+    '2026-06-29T10:44:36.186283+10:00' -> '10:44:36.186'."""
+    moment = datetime.fromisoformat(iso_time)
+    return f"{moment:%H:%M:%S}.{moment.microsecond // 1000:03d}"
+
+
+def clip_number(segment_id: str) -> int:
+    """'seg_0042' -> 42."""
+    return int(segment_id.rsplit("_", 1)[-1])
 
 
 def share(fraction: float) -> str:

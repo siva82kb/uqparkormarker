@@ -1,8 +1,10 @@
 """Read a subject's videos once, in the background, and remember the result.
 
-Reading from the network drive can take half a minute, so pages do not wait
+Reading from the network drive can take a minute or two, so pages do not wait
 for it: they start the read, show its progress, and use the result when it is
-ready. The result is kept in memory until the app stops.
+ready. The result is kept in memory, and on disk (`recording_store.py`), so
+the videos are read once per subject and not on every start of the app. They
+are read again only when the user asks (`forget`).
 """
 
 import threading
@@ -10,7 +12,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
-from . import dataset
+from . import dataset, recording_store
 from .dataset import Recording
 
 
@@ -29,8 +31,15 @@ _lock = threading.Lock()
 
 
 def cached(subject_dir: Path) -> Recording | None:
-    """The subject's recording if it has been read, else None."""
-    return _cache.get(Path(subject_dir))
+    """The subject's recording if it has been read, now or on an earlier
+    start of the app, else None."""
+    subject_dir = Path(subject_dir)
+    if subject_dir not in _cache:
+        saved = recording_store.load(subject_dir)
+        if saved is None:
+            return None
+        _cache[subject_dir] = saved
+    return _cache[subject_dir]
 
 
 def fetch(
@@ -40,9 +49,25 @@ def fetch(
 ) -> Recording:
     """The subject's recording, reading it now if it has not been read."""
     subject_dir = Path(subject_dir)
-    if subject_dir not in _cache:
-        _cache[subject_dir] = dataset.load(subject_dir, utc_offset_hours, on_progress)
-    return _cache[subject_dir]
+    recording = cached(subject_dir)
+    if recording is None:
+        recording = dataset.load(subject_dir, utc_offset_hours, on_progress)
+        recording_store.save(subject_dir, recording)
+        _cache[subject_dir] = recording
+    return recording
+
+
+def forget(subject_dir: Path) -> bool:
+    """Drop what was read for a subject, in memory and on disk, so the next
+    page reads the videos again. False if a read is running; nothing is
+    dropped then."""
+    with _lock:
+        if _progress.state == "running":
+            return False
+        _cache.pop(Path(subject_dir), None)
+        recording_store.forget(subject_dir)
+        _set(state="idle", done=0, total=0, message="", error="")
+    return True
 
 
 def start(subject_dir: Path, utc_offset_hours: float) -> None:

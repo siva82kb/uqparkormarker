@@ -64,6 +64,7 @@ class Recording:
 
     videos: list[Video]          # in recording order
     missing: list[str]           # named in experiment_details.json but absent
+    read_at: datetime | None = None   # when the files were read from the source
 
 
 def list_subjects(source: Path) -> list[str]:
@@ -117,6 +118,7 @@ def load(
     return Recording(
         videos=sorted(videos, key=lambda v: v.filename_time),
         missing=sorted(set(task_names) - stems),
+        read_at=datetime.now().astimezone().replace(microsecond=0),
     )
 
 

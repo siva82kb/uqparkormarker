@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Docs{% endblock %}
+{% block content %}
+<p class="eyebrow">Docs</p>
+<h1 class="title">How it works, and what to watch for</h1>
+<p class="lead">
+  These pages explain the method behind the app and the problems to keep in
+  mind. They are not needed to label clips.
+</p>
+
+{% set count = namespace(n=0) %}
+{% for group in groups %}
+<section>
+  <h2>{{ group.title }}</h2>
+  <p class="note">{{ group.about }}</p>
+  <ol class="contents">
+    {% for page in group.pages %}
+    {% set count.n = count.n + 1 %}
+    <li>
+      <span class="contents-number">{{ count.n }}</span>
+      <a class="contents-link" href="{{ url_for('docs_page', slug=page.slug) }}">{{ page.title }}</a>
+      <span class="contents-about">{{ page.about }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endfor %}
+{% endblock %}

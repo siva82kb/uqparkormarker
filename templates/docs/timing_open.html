@@ -1,0 +1,102 @@
+{% extends "docs/base.html" %}
+{% import "docs/_figures.html" as figures %}
+{% block heading %}What the rule does not settle{% endblock %}
+{% block lead %}
+The rule makes each clip's time trustworthy on the video computer's clock.
+It does not yet put the clips on the sensors' clock, and some questions are
+still unanswered.
+{% endblock %}
+
+{% block body %}
+<section class="prose">
+  <h2>Two clocks</h2>
+  <p>
+    The timestamps come from the clock of the computer that recorded the
+    video. Each sensor system keeps its own time. Two clocks never agree
+    exactly, and they slowly move apart.
+  </p>
+  <div class="example">
+    <p><strong>Example.</strong> Two wristwatches. One is 2.0 s ahead of the other in the morning and 2.3 s ahead by the evening.</p>
+    <p>The 2.0 s is the <strong>offset</strong>. The extra 0.3 s over the day is the <strong>drift</strong>. Knowing both, a time on one watch can be turned into a time on the other.</p>
+  </div>
+</section>
+
+<section>
+  <h2>How the jumps tie the clocks together</h2>
+  <figure class="fig">
+    <span class="fig-source">Diagram</span>
+    {{ figures.clocks() }}
+    <figcaption>
+      Each session has a jump task at the start and at the end. A landing is
+      sharp enough to find in both the video and the sensor data. The same
+      landing read on both clocks gives the difference between them, once at
+      the start and once at the end.
+    </figcaption>
+  </figure>
+  <div class="prose">
+    <p>
+      The landings also cancel the fixed delay between filming and stamping,
+      because that delay is the same in the jump videos as in every other
+      video.
+    </p>
+    <p><strong>This step has not been done. It is not part of this app.</strong></p>
+  </div>
+</section>
+
+<div class="pair pair-even">
+  <section>
+    <h2>What this app hands over</h2>
+    <ul class="problems">
+      <li>Each clip's video file and its first and last frame number. These are exact.</li>
+      <li>The timestamps of those two frames, as recorded, in local time.</li>
+      <li>Only clips with no gap and no repeated timestamp inside them.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What it leaves as it is</h2>
+    <ul class="problems">
+      <li>A timestamp can be one frame off, about 30 ms.</li>
+      <li>Every timestamp is taken a little after the frame was filmed. This fixed delay has not been measured.</li>
+      <li>Clip times are on the video computer's clock, not a sensor's.</li>
+    </ul>
+  </section>
+</div>
+
+<section>
+  <h2>Questions still open</h2>
+  <ul class="problems">
+    <li>
+      <strong>Do the sensors share the video computer's clock?</strong>
+      If they do, the jumps are only a check. If they do not, the jumps are
+      essential. This is not yet known.
+    </li>
+    <li>
+      <strong>Are the jump videos themselves clean?</strong> In most
+      participants one or both jump videos contain one to three repeated
+      timestamps or gaps. Landings should be read from parts of those videos
+      where the timestamps are normal.
+    </li>
+    <li>
+      <strong>Did the study's recording program stamp frames as the published one does?</strong>
+      The study videos are at 30 frames a second and the published program
+      records at 10, so a changed version was used. Its code has not been seen.
+    </li>
+    <li>
+      <strong>What caused the hold-ups of many seconds?</strong> The frame
+      rate explains scattered repeats. It does not explain these, and they
+      differ from session to session.
+    </li>
+    <li>
+      <strong>Should late timestamps be corrected instead of removed?</strong>
+      That would bring back the lost footage and tasks. It needs a method
+      that is agreed and validated first.
+    </li>
+    <li>
+      <strong>Other participants.</strong> Only the least affected one is
+      used so far. The others lose more footage and more tasks under the
+      same rule.
+    </li>
+  </ul>
+</section>
+{% endblock %}

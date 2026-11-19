@@ -103,6 +103,15 @@ class Problems(unittest.TestCase):
         (note,) = self.problems(video("task_000_1", 0, 30, task=0), late)
         self.assertIn("1 of the 2 tasks has no usable window", note)
 
+    def test_too_little_task_video_for_the_share_wanted(self):
+        study = {**STUDY, "sampling": {**STUDY["sampling"], "task_share": 0.5}}
+        clips = [video("task_000_1", 0, 30, task=0), video("unlabelled_x_2", 10, 300)]
+        s = summary.build(clips, study)
+        self.assertEqual((s.n_windows_task, s.n_windows_unlabelled), (3, 30))
+        self.assertEqual(s.quotas, {"task": 10, "unlabelled": 10})
+        (note,) = s.problems
+        self.assertIn("10 clips are wanted from task video, but it has room for only 3", note)
+
     def test_listed_but_absent_videos(self):
         s = summary.build([video("a", 0, 10)], STUDY, ["task_001_5", "unlabelled_x_6"])
         self.assertIn("2 videos listed", s.problems[0])

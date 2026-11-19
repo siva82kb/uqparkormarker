@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}All clips labelled · {{ subject }}{% endblock %}
+{% block content %}
+<p class="eyebrow">Finished</p>
+<h1>All {{ total }} clips are labelled</h1>
+<p class="lead">Thank you. Your labels for {{ subject }} are saved; there is nothing more to do.</p>
+
+<section>
+  <h2>Your labels</h2>
+  <table>
+    <thead>
+      <tr><th>Label</th><th class="num">Clips</th><th class="num">Share</th></tr>
+    </thead>
+    <tbody>
+      {% for name, count in counts.items() %}
+      <tr>
+        <td>{{ name }}</td>
+        <td class="num">{{ count }}</td>
+        <td class="num">{{ '%.0f' | format(100 * count / total) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Where they are saved</h2>
+  <pre class="code">{{ file }}</pre>
+  <p class="note">
+    The file has one row for every time you labelled a clip. If you changed a
+    label, the last row for that clip is the one that counts.
+  </p>
+</section>
+
+<p class="actions">
+  <a class="link" href="{{ url_for('annotate_page', position=last) }}">Look back through the clips</a>
+</p>
+{% endblock %}
